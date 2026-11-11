@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ema-candlestick-chart
+    name: charts
     runtime: python
     plan: free
     buildCommand: python -m compileall -q server.py
