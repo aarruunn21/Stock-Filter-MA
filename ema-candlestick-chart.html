@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daily, Weekly &amp; Monthly Moving Averages</title>
+  <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111d;
+      --panel: #0d1725;
+      --panel2: #111d2d;
+      --border: #243349;
+      --text: #e7edf7;
+      --muted: #90a3bc;
+      --green: #4be1a8;
+      --amber: #f7c75c;
+      --purple: #a68bff;
+      --red: #ff7b86;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: linear-gradient(180deg, #050c16, var(--bg));
+      color: var(--text);
+    }
+    main {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 6px 0 0;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      letter-spacing: -0.04em;
+    }
+    .sub { color: var(--muted); }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+      flex-wrap: wrap;
+      background: rgba(17, 29, 45, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select, button {
+      height: 38px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font: inherit;
+    }
+    input, select {
+      background: #0b1522;
+      color: var(--text);
+      padding: 0 10px;
+    }
+    #symbol { width: 120px; text-transform: uppercase; }
+    button {
+      background: #8bb6ff;
+      color: #081423;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0 18px;
+      border: none;
+    }
+    button:disabled { opacity: 0.7; cursor: wait; }
+    .status { color: var(--muted); font-size: 12px; min-height: 20px; margin: 10px 0 18px; }
+    .status.error { color: var(--red); }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 18px;
+      height: 2px;
+      display: inline-block;
+      border-radius: 10px;
+    }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .daily-panel {
+      margin-top: 20px;
+      background: rgba(13, 23, 37, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .histogram-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 12px;
+    }
+    .histogram-section { margin-top: 24px; }
+    .histogram-section-title {
+      margin: 0;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+    .histogram-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .histogram-box {
+      width: 100%;
+      height: 280px;
+      min-height: 240px;
+      overflow: hidden;
+    }
+    .panel {
+      background: rgba(13, 23, 37, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .panel-header h2, .panel-header h3 { margin: 0; font-size: inherit; }
+    .histogram-grid .panel-header { align-items: flex-start; }
+    .metric-heading { min-width: 0; }
+    .section-view-toggle {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      background: #17263a;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .distribution-canvas {
+      width: 100% !important;
+      height: 280px !important;
+    }
+    .panel-header small {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    .chart-wrap { padding: 12px; }
+    .chart-box {
+      width: 100%;
+      height: 560px;
+      min-height: 360px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .daily-chart-box { height: 640px; }
+    @media (max-width: 900px) {
+      .chart-grid { grid-template-columns: 1fr; }
+      .histogram-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .chart-box { height: 420px; }
+      .daily-chart-box { height: 420px; }
+    }
+    @media (max-width: 600px) {
+      .histogram-grid { grid-template-columns: 1fr; }
+      .histogram-section-header { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topbar">
+      <div>
+        <div class="sub">MARKET STRUCTURE · TREND FILTER</div>
+        <h1>Daily, Weekly &amp; Monthly Moving Averages</h1>
+      </div>
+
+      <form id="form" class="controls">
+        <div>
+          <label for="symbol">Ticker</label>
+          <input id="symbol" type="text" value="SPY" maxlength="20" autocomplete="off" required>
+        </div>
+        <div>
+          <label for="range">History</label>
+          <select id="range">
+            <option value="6mo">6 months</option>
+            <option value="1y" selected>1 year</option>
+            <option value="2y">2 years</option>
+            <option value="5y">5 years</option>
+            <option value="10y">10 years</option>
+            <option value="max">Max</option>
+          </select>
+        </div>
+        <button id="load" type="submit">Load chart</button>
+      </form>
+    </div>
+
+    <div class="legend">
+      <span><i class="swatch" style="background: #4be1a8"></i>20 EMA</span>
+      <span><i class="swatch" style="background: #f7c75c"></i>50 EMA</span>
+      <span><i class="swatch" style="background: #a68bff"></i>200 SMA</span>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Loading Yahoo Finance prices…</div>
+
+    <section class="chart-grid">
+      <section class="panel" aria-labelledby="weekly-heading">
+        <div class="panel-header">
+          <h2 id="weekly-heading">Weekly chart</h2>
+          <small>EMA 20 / EMA 50 / SMA 200</small>
+        </div>
+        <div class="chart-wrap"><div id="weeklyChart" class="chart-box" role="img" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+      </section>
+
+      <section class="panel" aria-labelledby="monthly-heading">
+        <div class="panel-header">
+          <h2 id="monthly-heading">Monthly chart</h2>
+          <small>EMA 20 / EMA 50 / SMA 200</small>
+        </div>
+        <div class="chart-wrap"><div id="monthlyChart" class="chart-box" role="img" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+      </section>
+    </section>
+
+    <section class="daily-panel" aria-labelledby="daily-heading">
+      <div class="panel-header">
+        <h2 id="daily-heading">Daily chart</h2>
+        <small>EMA 20 / EMA 50 / SMA 200</small>
+      </div>
+      <div class="chart-wrap"><div id="dailyChart" class="chart-box daily-chart-box" role="img" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+    </section>
+
+    <section class="histogram-section" aria-labelledby="weekly-metrics-heading">
+      <div class="histogram-section-header">
+        <h2 id="weekly-metrics-heading" class="histogram-section-title">Weekly outcomes · next week</h2>
+        <button class="section-view-toggle" id="weekly-view-toggle" type="button" aria-pressed="false">Show histogram</button>
+      </div>
+      <div class="histogram-grid">
+        <section class="panel" aria-labelledby="next-high-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="next-high-heading">Close → next week’s high (%)</h3>
+              <small>(Next High − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextWeekHighChart" class="histogram-box" role="img" aria-label="Each week's close to the following week's high in percent"></div>
+            <canvas id="distributionWeeklyHigh" class="distribution-canvas" aria-label="Distribution histogram for weekly close to next week's high" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="next-low-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="next-low-heading">Close → next week’s low (%)</h3>
+              <small>(Next Low − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextWeekLowChart" class="histogram-box" role="img" aria-label="Each week's signed close-to-next-week-low percentage over time"></div>
+            <canvas id="distributionWeeklyLow" class="distribution-canvas" aria-label="Distribution histogram for weekly absolute close to next week's low" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="next-max-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="next-max-heading">Max of #2 and #3 (%)</h3>
+              <small>Max(next-high %, absolute next-low %)</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextWeekMaxChart" class="histogram-box" role="img" aria-label="Per-week maximum of close to next week's high percentage and absolute close to next week's low percentage"></div>
+            <canvas id="distributionWeeklyMax" class="distribution-canvas" aria-label="Distribution histogram for weekly maximum metric" hidden></canvas>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="histogram-section" aria-labelledby="monthly-metrics-heading">
+      <div class="histogram-section-header">
+        <h2 id="monthly-metrics-heading" class="histogram-section-title">Monthly outcomes · next 4 weeks</h2>
+        <button class="section-view-toggle" id="monthly-view-toggle" type="button" aria-pressed="false">Show histogram</button>
+      </div>
+      <div class="histogram-grid">
+        <section class="panel" aria-labelledby="four-week-high-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="four-week-high-heading">Close → next 4-week high (%)</h3>
+              <small>(Next 4-week High − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextFourWeekHighChart" class="histogram-box" role="img" aria-label="Each week's close to the highest high in the following four weeks, in percent"></div>
+            <canvas id="distributionMonthlyHigh" class="distribution-canvas" aria-label="Distribution histogram for monthly close to next four-week high" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="four-week-low-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="four-week-low-heading">Close → next 4-week low (%)</h3>
+              <small>(Next 4-week Low − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextFourWeekLowChart" class="histogram-box" role="img" aria-label="Signed percentage distance from each week's close to the lowest low in the following four weeks"></div>
+            <canvas id="distributionMonthlyLow" class="distribution-canvas" aria-label="Distribution histogram for monthly absolute close to next four-week low" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="four-week-max-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="four-week-max-heading">Max of #2 and #3 (%)</h3>
+              <small>Max(next-high %, absolute next-low %)</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextFourWeekMaxChart" class="histogram-box" role="img" aria-label="Per-week maximum of close to next four-week high percentage and absolute close to next four-week low percentage"></div>
+            <canvas id="distributionMonthlyMax" class="distribution-canvas" aria-label="Distribution histogram for monthly maximum metric" hidden></canvas>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+
+      const weeklyChartEl = $('#weeklyChart');
+      const monthlyChartEl = $('#monthlyChart');
+      const dailyChartEl = $('#dailyChart');
+
+      if (!window.LightweightCharts) {
+        $('#status').textContent = 'Chart library failed to load.';
+        $('#status').classList.add('error');
+        return;
+      }
+
+      function makeChart(el) {
+        const chart = LightweightCharts.createChart(el, {
+          autoSize: true,
+          layout: {
+            background: { type: 'solid', color: '#0d1725' },
+            textColor: '#a8b6cc',
+            fontFamily: 'system-ui, sans-serif'
+          },
+          grid: {
+            vertLines: { color: '#1a2a3b' },
+            horzLines: { color: '#1a2a3b' }
+          },
+          rightPriceScale: {
+            borderColor: '#2d3d54',
+            scaleMargins: { top: 0.08, bottom: 0.08 }
+          },
+          timeScale: { borderColor: '#2d3d54', fixLeftEdge: true },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+
+        const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
+          upColor: '#4be1a8',
+          downColor: '#ff7b86',
+          borderUpColor: '#4be1a8',
+          borderDownColor: '#ff7b86',
+          wickUpColor: '#4be1a8',
+          wickDownColor: '#ff7b86'
+        });
+
+        const ema20 = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#4be1a8', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+        });
+        const ema50 = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#f7c75c', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+        });
+        const sma200 = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#a68bff', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+        });
+
+        return { chart, candleSeries, ema20, ema50, sma200 };
+      }
+
+      const weekly = makeChart(weeklyChartEl);
+      const monthly = makeChart(monthlyChartEl);
+      const daily = makeChart(dailyChartEl);
+      function makeHistogramChart(el, color) {
+        const chart = LightweightCharts.createChart(el, {
+          autoSize: true,
+          layout: {
+            background: { type: 'solid', color: '#0d1725' },
+            textColor: '#a8b6cc',
+            fontFamily: 'system-ui, sans-serif'
+          },
+          grid: {
+            vertLines: { color: '#1a2a3b' },
+            horzLines: { color: '#1a2a3b' }
+          },
+          rightPriceScale: { borderColor: '#2d3d54' },
+          timeScale: { borderColor: '#2d3d54', fixLeftEdge: true },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+        const series = chart.addSeries(LightweightCharts.HistogramSeries, {
+          color,
+          priceLineVisible: false,
+          priceFormat: {
+            type: 'custom',
+            minMove: 0.01,
+            formatter: (value) => `${value.toFixed(2)}%`
+          }
+        });
+        return { chart, series };
+      }
+
+      const nextWeekHighHistogram = makeHistogramChart($('#nextWeekHighChart'), '#f7c75c');
+      const nextWeekLowHistogram = makeHistogramChart($('#nextWeekLowChart'), '#a68bff');
+      const nextWeekMaxHistogram = makeHistogramChart($('#nextWeekMaxChart'), '#8bb6ff');
+      const nextFourWeekHighHistogram = makeHistogramChart($('#nextFourWeekHighChart'), '#f7c75c');
+      const nextFourWeekLowHistogram = makeHistogramChart($('#nextFourWeekLowChart'), '#a68bff');
+      const nextFourWeekMaxHistogram = makeHistogramChart($('#nextFourWeekMaxChart'), '#8bb6ff');
+      const metricViews = {
+        weeklyHigh: {
+          histogram: nextWeekHighHistogram,
+          barElement: $('#nextWeekHighChart'),
+          canvas: $('#distributionWeeklyHigh'),
+          color: '#f7c75c', negativeColor: '#ff7b86', points: [], distributionChart: null
+        },
+        weeklyLow: {
+          histogram: nextWeekLowHistogram,
+          barElement: $('#nextWeekLowChart'),
+          canvas: $('#distributionWeeklyLow'),
+          color: '#a68bff', points: [], distributionChart: null
+        },
+        weeklyMax: {
+          histogram: nextWeekMaxHistogram,
+          barElement: $('#nextWeekMaxChart'),
+          canvas: $('#distributionWeeklyMax'),
+          color: '#8bb6ff', points: [], distributionChart: null
+        },
+        monthlyHigh: {
+          histogram: nextFourWeekHighHistogram,
+          barElement: $('#nextFourWeekHighChart'),
+          canvas: $('#distributionMonthlyHigh'),
+          color: '#f7c75c', negativeColor: '#ff7b86', points: [], distributionChart: null
+        },
+        monthlyLow: {
+          histogram: nextFourWeekLowHistogram,
+          barElement: $('#nextFourWeekLowChart'),
+          canvas: $('#distributionMonthlyLow'),
+          color: '#a68bff', points: [], distributionChart: null
+        },
+        monthlyMax: {
+          histogram: nextFourWeekMaxHistogram,
+          barElement: $('#nextFourWeekMaxChart'),
+          canvas: $('#distributionMonthlyMax'),
+          color: '#8bb6ff', points: [], distributionChart: null
+        }
+      };
+      const metricSections = {
+        weekly: {
+          toggle: $('#weekly-view-toggle'),
+          views: ['weeklyHigh', 'weeklyLow', 'weeklyMax'].map((key) => metricViews[key]),
+          showHistogram: false
+        },
+        monthly: {
+          toggle: $('#monthly-view-toggle'),
+          views: ['monthlyHigh', 'monthlyLow', 'monthlyMax'].map((key) => metricViews[key]),
+          showHistogram: false
+        }
+      };
+      let activeRequest = null;
+
+      function buildDistribution(values) {
+        if (!values.length) return { labels: [], counts: [], centers: [] };
+
+        let min = Math.min(...values);
+        let max = Math.max(...values);
+        if (min === max) {
+          const padding = Math.max(Math.abs(min) * 0.05, 0.25);
+          min -= padding;
+          max += padding;
+        }
+
+        const binCount = Math.min(20, Math.max(5, Math.ceil(Math.sqrt(values.length))));
+        const binWidth = (max - min) / binCount;
+        const counts = Array(binCount).fill(0);
+        for (const value of values) {
+          const index = Math.min(binCount - 1, Math.floor((value - min) / binWidth));
+          counts[index]++;
+        }
+
+        const digits = binWidth < 0.1 ? 2 : 1;
+        const bins = counts.map((count, index) => {
+          const lower = min + index * binWidth;
+          const upper = min + (index + 1) * binWidth;
+          return {
+            count,
+            center: min + (index + 0.5) * binWidth,
+            label: `${lower.toFixed(digits)}–${upper.toFixed(digits)}%`
+          };
+        });
+        bins.sort((a, b) => a.center - b.center);
+        return {
+          labels: bins.map((bin) => bin.label),
+          counts: bins.map((bin) => bin.count),
+          centers: bins.map((bin) => bin.center)
+        };
+      }
+
+      function renderDistribution(view) {
+        const { labels, counts, centers } = buildDistribution(
+          view.points.map((point) => point.value).filter(Number.isFinite)
+        );
+        const data = {
+          labels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Weeks',
+              data: counts,
+              backgroundColor: centers.map((center) => (
+                view.negativeColor && center < 0 ? view.negativeColor : view.color
+              )),
+              borderColor: centers.map((center) => (
+                view.negativeColor && center < 0 ? view.negativeColor : view.color
+              )),
+              borderWidth: 1,
+              yAxisID: 'y'
+            }
+          ]
+        };
+
+        if (!view.distributionChart) {
+          view.distributionChart = new Chart(view.canvas, {
+            type: 'bar',
+            data,
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    title: (items) => items[0]?.label || '',
+                    label: (item) => `${item.parsed.y} weeks`
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  title: { display: true, text: 'Metric value (%)', color: '#90a3bc' },
+                  ticks: {
+                    color: '#a8b6cc',
+                    autoSkip: true,
+                    maxTicksLimit: 5,
+                    maxRotation: 0,
+                    minRotation: 0,
+                    font: { size: 9 }
+                  },
+                  grid: { color: '#1a2a3b' }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: 'Number of weeks', color: '#90a3bc' },
+                  ticks: {
+                    color: '#a8b6cc',
+                    precision: 0,
+                    maxTicksLimit: 5,
+                    font: { size: 10 },
+                    padding: 6
+                  },
+                  grid: { color: '#1a2a3b' }
+                }
+              }
+            }
+          });
+        } else {
+          view.distributionChart.data = data;
+          view.distributionChart.update('none');
+        }
+      }
+
+      function setMetricPoints(view, points) {
+        view.points = points;
+        view.histogram.series.setData(points);
+        if (!view.canvas.hidden && window.Chart) renderDistribution(view);
+      }
+
+      for (const section of Object.values(metricSections)) {
+        section.toggle.addEventListener('click', () => {
+          const showDistribution = !section.showHistogram;
+          if (showDistribution && !window.Chart) {
+            $('#status').textContent = 'Histogram library failed to load; check your connection and reload.';
+            $('#status').classList.add('error');
+            return;
+          }
+
+          section.showHistogram = showDistribution;
+          section.toggle.textContent = showDistribution ? 'Show time series' : 'Show histogram';
+          section.toggle.setAttribute('aria-pressed', String(showDistribution));
+          for (const view of section.views) {
+            view.canvas.hidden = !showDistribution;
+            view.barElement.hidden = showDistribution;
+            if (showDistribution) renderDistribution(view);
+          }
+        });
+      }
+
+      function ema(values, period) {
+        const averages = Array(values.length).fill(null);
+        if (!Number.isInteger(period) || period <= 0 || values.length < period) return averages;
+
+        const k = 2 / (period + 1);
+        let prev = values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
+        averages[period - 1] = prev;
+
+        for (let i = period; i < values.length; i++) {
+          prev = values[i] * k + prev * (1 - k);
+          averages[i] = prev;
+        }
+        return averages;
+      }
+
+      function sma(values, period) {
+        const averages = Array(values.length).fill(null);
+        if (!Number.isInteger(period) || period <= 0) return averages;
+
+        let sum = 0;
+        for (let i = 0; i < values.length; i++) {
+          sum += values[i];
+          if (i >= period) sum -= values[i - period];
+          if (i >= period - 1) averages[i] = sum / period;
+        }
+        return averages;
+      }
+
+      function getWeekStart(dateString) {
+        const d = new Date(dateString + 'T00:00:00Z');
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() - (day - 1));
+        return d.toISOString().slice(0, 10);
+      }
+
+      function getRangeStartDate(range, latestDate) {
+        const monthsByRange = { '6mo': 6, '1y': 12, '2y': 24, '5y': 60, '10y': 120 };
+        const months = monthsByRange[range];
+        if (!months) return null;
+
+        const [year, month, day] = latestDate.split('-').map(Number);
+        const targetMonthIndex = year * 12 + month - 1 - months;
+        const targetYear = Math.floor(targetMonthIndex / 12);
+        const targetMonth = (targetMonthIndex % 12 + 12) % 12;
+        const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+        return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)))
+          .toISOString()
+          .slice(0, 10);
+      }
+
+      function aggregateRows(rows, mode) {
+        const map = new Map();
+
+        for (const row of rows) {
+          const key = mode === 'weekly'
+            ? getWeekStart(row.date)
+            : new Date(row.date.slice(0, 7) + '-01T00:00:00Z').toISOString().slice(0, 10);
+
+          if (!map.has(key)) {
+            map.set(key, {
+              time: key,
+              open: row.open,
+              high: row.high,
+              low: row.low,
+              close: row.close
+            });
+          } else {
+            const current = map.get(key);
+            current.high = Math.max(current.high, row.high);
+            current.low = Math.min(current.low, row.low);
+            current.close = row.close;
+          }
+        }
+
+        return Array.from(map.values()).sort((a, b) => a.time.localeCompare(b.time));
+      }
+
+      function toCandlePoints(rows) {
+        return rows.map((row) => ({
+          time: row.time || row.date,
+          open: row.open,
+          high: row.high,
+          low: row.low,
+          close: row.close
+        }));
+      }
+
+      function buildLineSeries(series, points) {
+        series.setData(points.filter((p) => Number.isFinite(p.value)));
+      }
+
+      function buildMoveSeries(closeValues, timeLabels, period) {
+        const values = ema(closeValues, period);
+        return closeValues.map((_, i) => ({ time: timeLabels[i].time || timeLabels[i].date, value: values[i] }));
+      }
+
+      function formatOutput(value, currency) {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency,
+          maximumFractionDigits: 2
+        }).format(value);
+      }
+
+      function clearChartData() {
+        for (const data of [weekly, monthly, daily]) {
+          data.candleSeries.setData([]);
+          data.ema20.setData([]);
+          data.ema50.setData([]);
+          data.sma200.setData([]);
+        }
+        for (const view of Object.values(metricViews)) {
+          view.points = [];
+          view.histogram.series.setData([]);
+          if (view.distributionChart) renderDistribution(view);
+        }
+      }
+
+      function buildWeeklyMetrics(rows) {
+        const nextWeekHigh = [];
+        const nextWeekLow = [];
+        const nextWeekMax = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const current = rows[i];
+          const next = rows[i + 1];
+          if (!next || current.close <= 0) continue;
+
+          const highPercent = ((next.high - current.close) / current.close) * 100;
+          const lowPercent = ((next.low - current.close) / current.close) * 100;
+          nextWeekHigh.push({ time: current.time, value: highPercent });
+          nextWeekLow.push({ time: current.time, value: lowPercent });
+          nextWeekMax.push({ time: current.time, value: Math.max(highPercent, Math.abs(lowPercent)) });
+        }
+
+        return { nextWeekHigh, nextWeekLow, nextWeekMax };
+      }
+
+      function buildMonthlyMetrics(rows) {
+        const nextFourWeekHigh = [];
+        const nextFourWeekLow = [];
+        const nextFourWeekMax = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const current = rows[i];
+          if (i + 4 >= rows.length || current.close <= 0) continue;
+          const forwardWindow = rows.slice(i + 1, i + 5);
+          const highPercent = ((Math.max(...forwardWindow.map((row) => row.high)) - current.close) / current.close) * 100;
+          const lowPercent = ((Math.min(...forwardWindow.map((row) => row.low)) - current.close) / current.close) * 100;
+          nextFourWeekHigh.push({ time: current.time, value: highPercent });
+          nextFourWeekLow.push({ time: current.time, value: lowPercent });
+          nextFourWeekMax.push({ time: current.time, value: Math.max(highPercent, Math.abs(lowPercent)) });
+        }
+
+        return { nextFourWeekHigh, nextFourWeekLow, nextFourWeekMax };
+      }
+
+      async function loadChart() {
+        if (activeRequest) {
+          activeRequest.abort();
+          activeRequest = null;
+        }
+
+        const symbol = $('#symbol').value.trim().toUpperCase();
+        const range = $('#range').value;
+
+        if (!symbol) {
+          $('#status').textContent = 'Please enter a ticker.';
+          $('#status').classList.add('error');
+          $('#load').disabled = false;
+          return;
+        }
+
+        const controller = new AbortController();
+        activeRequest = controller;
+        clearChartData();
+        $('#status').classList.remove('error');
+        $('#status').textContent = `Fetching full history for ${symbol}…`;
+        $('#load').disabled = true;
+
+        try {
+          const response = await fetch(
+            `/api/chart?symbol=${encodeURIComponent(symbol)}&range=max`,
+            { signal: controller.signal }
+          );
+          let json;
+          try {
+            json = await response.json();
+          } catch (error) {
+            if (controller.signal.aborted) throw error;
+            throw new Error('Server returned invalid JSON.');
+          }
+          if (controller.signal.aborted) return;
+
+          if (!response.ok) {
+            throw new Error(json?.error || `Server error ${response.status}`);
+          }
+
+          if (json?.chart?.error) {
+            throw new Error(json.chart.error.description || json.chart.error.code || 'Price service error.');
+          }
+
+          const result = json?.chart?.result?.[0];
+          if (!result) throw new Error('No price history returned.');
+          if (result.meta?.dataGranularity && result.meta.dataGranularity !== '1d') {
+            throw new Error('The server returned non-daily data. Restart the chart server to load full daily history.');
+          }
+
+          const quote = result.indicators?.quote?.[0];
+          const requiredFields = ['open', 'high', 'low', 'close'];
+          if (
+            !Array.isArray(result.timestamp) ||
+            !quote ||
+            !requiredFields.every((field) => Array.isArray(quote[field]))
+          ) {
+            throw new Error('Price data response is incomplete.');
+          }
+
+          let marketDateFormatter;
+          try {
+            marketDateFormatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: result.meta?.exchangeTimezoneName || 'UTC',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          } catch {
+            marketDateFormatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'UTC',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          }
+
+          const rowsByDate = new Map();
+
+          for (let i = 0; i < result.timestamp.length; i++) {
+            const timestamp = result.timestamp[i];
+            const open = quote.open[i];
+            const high = quote.high[i];
+            const low = quote.low[i];
+            const close = quote.close[i];
+            if (![timestamp, open, high, low, close].every(Number.isFinite)) continue;
+            if (high < low || high < Math.max(open, close) || low > Math.min(open, close)) continue;
+
+            const date = new Date(timestamp * 1000);
+            if (!Number.isFinite(date.getTime())) continue;
+            const dateParts = Object.fromEntries(
+              marketDateFormatter.formatToParts(date).map(({ type, value }) => [type, value])
+            );
+
+            const dateKey = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+            const current = rowsByDate.get(dateKey);
+            if (!current) {
+              rowsByDate.set(dateKey, {
+                date: dateKey,
+                open,
+                high,
+                low,
+                close,
+                firstTimestamp: timestamp,
+                lastTimestamp: timestamp
+              });
+            } else {
+              current.high = Math.max(current.high, high);
+              current.low = Math.min(current.low, low);
+              if (timestamp < current.firstTimestamp) {
+                current.open = open;
+                current.firstTimestamp = timestamp;
+              }
+              if (timestamp >= current.lastTimestamp) {
+                current.close = close;
+                current.lastTimestamp = timestamp;
+              }
+            }
+          }
+
+          const rows = Array.from(
+            rowsByDate.values(),
+            ({ firstTimestamp, lastTimestamp, ...row }) => row
+          );
+          if (!rows.length) throw new Error('No valid price bars were returned.');
+          rows.sort((a, b) => a.date.localeCompare(b.date));
+
+          const allDailyRows = rows.map((row) => ({
+            time: row.date,
+            open: row.open,
+            high: row.high,
+            low: row.low,
+            close: row.close
+          }));
+
+          const allWeeklyRows = aggregateRows(rows, 'weekly');
+          const allMonthlyRows = aggregateRows(rows, 'monthly');
+          const visibleStart = getRangeStartDate(range, rows.at(-1).date);
+          const weeklyStart = visibleStart ? getWeekStart(visibleStart) : null;
+          const monthlyStart = visibleStart ? `${visibleStart.slice(0, 7)}-01` : null;
+          const dailyRows = allDailyRows.filter((row) => !visibleStart || row.time >= visibleStart);
+          const weeklyRows = allWeeklyRows.filter((row) => !weeklyStart || row.time >= weeklyStart);
+          const monthlyRows = allMonthlyRows.filter((row) => !monthlyStart || row.time >= monthlyStart);
+
+          if (!dailyRows.length) throw new Error('No price bars fall within the selected display range.');
+
+          weekly.candleSeries.setData(toCandlePoints(weeklyRows));
+          monthly.candleSeries.setData(toCandlePoints(monthlyRows));
+          daily.candleSeries.setData(toCandlePoints(dailyRows));
+
+          const weeklyMetrics = buildWeeklyMetrics(allWeeklyRows);
+          setMetricPoints(
+            metricViews.weeklyLow,
+            weeklyMetrics.nextWeekLow.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(
+            metricViews.weeklyMax,
+            weeklyMetrics.nextWeekMax.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(metricViews.weeklyHigh,
+            weeklyMetrics.nextWeekHigh
+              .filter((point) => !weeklyStart || point.time >= weeklyStart)
+              .map((point) => ({
+                ...point,
+                color: point.value < 0 ? '#ff7b86' : '#f7c75c'
+              }))
+          );
+
+          const monthlyMetrics = buildMonthlyMetrics(allWeeklyRows);
+          setMetricPoints(
+            metricViews.monthlyLow,
+            monthlyMetrics.nextFourWeekLow.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(
+            metricViews.monthlyMax,
+            monthlyMetrics.nextFourWeekMax.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(metricViews.monthlyHigh,
+            monthlyMetrics.nextFourWeekHigh
+              .filter((point) => !weeklyStart || point.time >= weeklyStart)
+              .map((point) => ({
+                ...point,
+                color: point.value < 0 ? '#ff7b86' : '#f7c75c'
+              }))
+          );
+
+          const dailyCloses = allDailyRows.map((row) => row.close);
+          const weeklyCloses = allWeeklyRows.map((row) => row.close);
+          const monthlyCloses = allMonthlyRows.map((row) => row.close);
+          const dailySma200 = sma(dailyCloses, 200);
+          const weeklySma200 = sma(weeklyCloses, 200);
+          const monthlySma200 = sma(monthlyCloses, 200);
+
+          buildLineSeries(weekly.ema20, buildMoveSeries(weeklyCloses, allWeeklyRows, 20)
+            .filter((point) => !weeklyStart || point.time >= weeklyStart));
+          buildLineSeries(weekly.ema50, buildMoveSeries(weeklyCloses, allWeeklyRows, 50)
+            .filter((point) => !weeklyStart || point.time >= weeklyStart));
+          buildLineSeries(weekly.sma200, allWeeklyRows.map((row, i) => ({
+            time: row.time,
+            value: weeklySma200[i]
+          })).filter((point) => !weeklyStart || point.time >= weeklyStart));
+
+          buildLineSeries(monthly.ema20, buildMoveSeries(monthlyCloses, allMonthlyRows, 20)
+            .filter((point) => !monthlyStart || point.time >= monthlyStart));
+          buildLineSeries(monthly.ema50, buildMoveSeries(monthlyCloses, allMonthlyRows, 50)
+            .filter((point) => !monthlyStart || point.time >= monthlyStart));
+          buildLineSeries(monthly.sma200, allMonthlyRows.map((row, i) => ({
+            time: row.time,
+            value: monthlySma200[i]
+          })).filter((point) => !monthlyStart || point.time >= monthlyStart));
+
+          buildLineSeries(daily.ema20, buildMoveSeries(dailyCloses, allDailyRows, 20)
+            .filter((point) => !visibleStart || point.time >= visibleStart));
+          buildLineSeries(daily.ema50, buildMoveSeries(dailyCloses, allDailyRows, 50)
+            .filter((point) => !visibleStart || point.time >= visibleStart));
+          buildLineSeries(daily.sma200, allDailyRows.map((row, i) => ({
+            time: row.time,
+            value: dailySma200[i]
+          })).filter((point) => !visibleStart || point.time >= visibleStart));
+
+          const last = rows.at(-1);
+          const prev = rows.at(-2);
+          const changePct = prev && prev.close !== 0
+            ? ((last.close / prev.close) - 1) * 100
+            : null;
+          const changeText = changePct === null
+            ? ''
+            : ` (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
+          const currency = /^[A-Z]{3}$/.test(result.meta?.currency || '')
+            ? result.meta.currency
+            : 'USD';
+          const warmingUp = [
+            ['daily', allDailyRows.length],
+            ['weekly', allWeeklyRows.length],
+            ['monthly', allMonthlyRows.length]
+          ]
+            .map(([timeframe, count]) => {
+              const missing = [];
+              if (count < 20) missing.push('EMA 20');
+              if (count < 50) missing.push('EMA 50');
+              if (count < 200) missing.push('SMA 200');
+              return missing.length ? `${timeframe} ${count} bars (${missing.join('/')})` : null;
+            })
+            .filter(Boolean);
+          const averageStatus = warmingUp.length
+            ? ` · Waiting for enough bars: ${warmingUp.join('; ')}`
+            : '';
+          const displayStatus = range === 'max' ? 'all history displayed' : `${range} displayed`;
+
+          $('#status').textContent = `${symbol} — ${displayStatus}; averages use all available history · Last ${formatOutput(last.close, currency)}${changeText}${averageStatus}`;
+          weekly.chart.timeScale().fitContent();
+          monthly.chart.timeScale().fitContent();
+          daily.chart.timeScale().fitContent();
+          for (const view of Object.values(metricViews)) {
+            view.histogram.chart.timeScale().fitContent();
+          }
+        } catch (error) {
+          if (error?.name !== 'AbortError') {
+            $('#status').textContent = error instanceof Error ? error.message : 'Unable to load chart data.';
+            $('#status').classList.add('error');
+          }
+        } finally {
+          if (activeRequest === controller) {
+            activeRequest = null;
+            $('#load').disabled = false;
+          }
+        }
+      }
+
+      $('#form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadChart();
+      });
+
+      loadChart();
+    })();
+  </script>
+</body>
+</html>
