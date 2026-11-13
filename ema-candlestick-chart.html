@@ -1,170 +1,1450 @@
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs, urlencode
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
-from pathlib import Path
-import json
-import os
-import re
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Daily, Weekly &amp; Monthly Moving Averages</title>
+  <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f1f2f4;
+      --panel: #ffffff;
+      --panel2: #f8f9fa;
+      --border: #d9dde3;
+      --text: #26313f;
+      --muted: #687586;
+      --green: #4be1a8;
+      --amber: #f7c75c;
+      --purple: #a68bff;
+      --red: #ff7b86;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: linear-gradient(180deg, #f7f8f9, var(--bg));
+      color: var(--text);
+    }
+    main {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 28px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 6px 0 0;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      letter-spacing: -0.04em;
+    }
+    .sub { color: var(--muted); }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+      flex-wrap: wrap;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    label {
+      display: block;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select, button {
+      height: 38px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font: inherit;
+    }
+    input, select {
+      background: #fff;
+      color: var(--text);
+      padding: 0 10px;
+    }
+    #symbol { width: 120px; text-transform: uppercase; }
+    button {
+      background: #8bb6ff;
+      color: #081423;
+      font-weight: 800;
+      cursor: pointer;
+      padding: 0 18px;
+      border: none;
+    }
+    button:disabled { opacity: 0.7; cursor: wait; }
+    .status { color: var(--muted); font-size: 12px; min-height: 20px; margin: 10px 0 18px; }
+    .status.error { color: var(--red); }
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .swatch {
+      width: 18px;
+      height: 2px;
+      display: inline-block;
+      border-radius: 10px;
+    }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    .daily-panel {
+      margin-top: 20px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .histogram-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 12px;
+    }
+    .histogram-section { margin-top: 24px; }
+    .histogram-section-title {
+      margin: 0;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+    .histogram-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .histogram-box {
+      width: 100%;
+      height: 280px;
+      min-height: 240px;
+      overflow: hidden;
+    }
+    .panel {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+    }
+    .panel-header h2, .panel-header h3 { margin: 0; font-size: inherit; }
+    .drawing-tools {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .drawing-tools button {
+      height: 30px;
+      padding: 0 9px;
+      border: 1px solid var(--border);
+      background: #f1f3f5;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 650;
+    }
+    .drawing-tools button[aria-pressed="true"] {
+      border-color: #3478c8;
+      background: #e8f1fb;
+      color: #1d5eaa;
+    }
+    .drawing-tools button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .histogram-grid .panel-header { align-items: flex-start; }
+    .metric-heading { min-width: 0; }
+    .section-view-toggle {
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      background: #f1f3f5;
+      color: var(--text);
+      font-size: 12px;
+    }
+    .distribution-canvas {
+      width: 100% !important;
+      height: 280px !important;
+      background: #fff;
+    }
+    .panel-header small {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    .chart-wrap { padding: 12px; }
+    .chart-box {
+      width: 100%;
+      height: 560px;
+      min-height: 360px;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+    .drawing-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .drawing-line {
+      stroke: #e05a33;
+      stroke-width: 2;
+      stroke-dasharray: 7 4;
+      vector-effect: non-scaling-stroke;
+    }
+    .drawing-line.selected { stroke: #1769c2; stroke-width: 3; }
+    .drawing-handle {
+      fill: #fff;
+      stroke: #1769c2;
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+      pointer-events: all;
+      cursor: move;
+    }
+    .drawing-overlay[data-active="true"] { cursor: crosshair; }
+    @media (max-width: 700px) {
+      .panel-header { align-items: flex-start; flex-direction: column; }
+      .drawing-tools { justify-content: flex-start; }
+    }
+    .daily-chart-box { height: 640px; }
+    @media (max-width: 900px) {
+      .chart-grid { grid-template-columns: 1fr; }
+      .histogram-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .chart-box { height: 420px; }
+      .daily-chart-box { height: 420px; }
+    }
+    @media (max-width: 600px) {
+      .histogram-grid { grid-template-columns: 1fr; }
+      .histogram-section-header { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topbar">
+      <div>
+        <div class="sub">MARKET STRUCTURE · TREND FILTER</div>
+        <h1>Daily, Weekly &amp; Monthly Moving Averages</h1>
+      </div>
 
-PORT = 8765
-VALID_RANGES = {"6mo", "1y", "2y", "5y", "10y", "max"}
-WEB_ROOT = Path(__file__).resolve().parent
-YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
-DAILY_CHUNK_SECONDS = 9 * 365 * 24 * 60 * 60
+      <form id="form" class="controls">
+        <div>
+          <label for="symbol">Ticker</label>
+          <input id="symbol" type="text" value="SPY" maxlength="20" autocomplete="off" required>
+        </div>
+        <div>
+          <label for="range">History</label>
+          <select id="range">
+            <option value="6mo">6 months</option>
+            <option value="1y" selected>1 year</option>
+            <option value="2y">2 years</option>
+            <option value="5y">5 years</option>
+            <option value="10y">10 years</option>
+            <option value="max">Max</option>
+          </select>
+        </div>
+        <button id="load" type="submit">Load chart</button>
+      </form>
+    </div>
 
+    <div class="legend">
+      <span><i class="swatch" style="background: #138a63"></i>20 EMA</span>
+      <span><i class="swatch" style="background: #c48600"></i>50 EMA</span>
+      <span><i class="swatch" style="background: #7654d6"></i>200 SMA</span>
+    </div>
 
-def fetch_yahoo_chart(symbol, params):
-    query = urlencode(params)
-    request = Request(
-        f"{YAHOO_CHART_URL.format(symbol)}?{query}",
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 Chrome/125.0 Safari/537.36"
-            )
+    <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Loading Yahoo Finance prices…</div>
+
+    <section class="chart-grid">
+      <section class="panel" aria-labelledby="weekly-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="weekly-heading">Weekly chart</h2>
+            <small>EMA 20 / EMA 50 / SMA 200</small>
+          </div>
+          <div class="drawing-tools" data-drawing-tools="weekly" aria-label="Weekly chart drawing tools">
+            <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
+            <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
+            <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+            <button type="button" data-drawing-action="delete" disabled>Delete</button>
+            <button type="button" data-drawing-action="clear">Clear</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><div id="weeklyChart" class="chart-box" role="img" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+      </section>
+
+      <section class="panel" aria-labelledby="monthly-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="monthly-heading">Monthly chart</h2>
+            <small>EMA 20 / EMA 50 / SMA 200</small>
+          </div>
+          <div class="drawing-tools" data-drawing-tools="monthly" aria-label="Monthly chart drawing tools">
+            <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
+            <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
+            <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+            <button type="button" data-drawing-action="delete" disabled>Delete</button>
+            <button type="button" data-drawing-action="clear">Clear</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><div id="monthlyChart" class="chart-box" role="img" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+      </section>
+    </section>
+
+    <section class="daily-panel" aria-labelledby="daily-heading">
+      <div class="panel-header">
+        <div>
+          <h2 id="daily-heading">Daily chart</h2>
+          <small>EMA 20 / EMA 50 / SMA 200</small>
+        </div>
+        <div class="drawing-tools" data-drawing-tools="daily" aria-label="Daily chart drawing tools">
+          <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
+          <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
+          <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+          <button type="button" data-drawing-action="delete" disabled>Delete</button>
+          <button type="button" data-drawing-action="clear">Clear</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><div id="dailyChart" class="chart-box daily-chart-box" role="img" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+    </section>
+
+    <section class="histogram-section" aria-labelledby="weekly-metrics-heading">
+      <div class="histogram-section-header">
+        <h2 id="weekly-metrics-heading" class="histogram-section-title">Weekly outcomes · next week</h2>
+        <button class="section-view-toggle" id="weekly-view-toggle" type="button" aria-pressed="false">Show histogram</button>
+      </div>
+      <div class="histogram-grid">
+        <section class="panel" aria-labelledby="next-high-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="next-high-heading">Close → next week’s high (%)</h3>
+              <small>(Next High − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextWeekHighChart" class="histogram-box" role="img" aria-label="Each week's close to the following week's high in percent"></div>
+            <canvas id="distributionWeeklyHigh" class="distribution-canvas" aria-label="Distribution histogram for weekly close to next week's high" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="next-low-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="next-low-heading">Close → next week’s low (%)</h3>
+              <small>(Next Low − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextWeekLowChart" class="histogram-box" role="img" aria-label="Each week's signed close-to-next-week-low percentage over time"></div>
+            <canvas id="distributionWeeklyLow" class="distribution-canvas" aria-label="Distribution histogram for weekly absolute close to next week's low" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="next-max-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="next-max-heading">Max of #2 and #3 (%)</h3>
+              <small>Max(next-high %, absolute next-low %)</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextWeekMaxChart" class="histogram-box" role="img" aria-label="Per-week maximum of close to next week's high percentage and absolute close to next week's low percentage"></div>
+            <canvas id="distributionWeeklyMax" class="distribution-canvas" aria-label="Distribution histogram for weekly maximum metric" hidden></canvas>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="histogram-section" aria-labelledby="monthly-metrics-heading">
+      <div class="histogram-section-header">
+        <h2 id="monthly-metrics-heading" class="histogram-section-title">Monthly outcomes · next 4 weeks</h2>
+        <button class="section-view-toggle" id="monthly-view-toggle" type="button" aria-pressed="false">Show histogram</button>
+      </div>
+      <div class="histogram-grid">
+        <section class="panel" aria-labelledby="four-week-high-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="four-week-high-heading">Close → next 4-week high (%)</h3>
+              <small>(Next 4-week High − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextFourWeekHighChart" class="histogram-box" role="img" aria-label="Each week's close to the highest high in the following four weeks, in percent"></div>
+            <canvas id="distributionMonthlyHigh" class="distribution-canvas" aria-label="Distribution histogram for monthly close to next four-week high" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="four-week-low-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="four-week-low-heading">Close → next 4-week low (%)</h3>
+              <small>(Next 4-week Low − Close) / Close × 100</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextFourWeekLowChart" class="histogram-box" role="img" aria-label="Signed percentage distance from each week's close to the lowest low in the following four weeks"></div>
+            <canvas id="distributionMonthlyLow" class="distribution-canvas" aria-label="Distribution histogram for monthly absolute close to next four-week low" hidden></canvas>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="four-week-max-heading">
+          <div class="panel-header">
+            <div class="metric-heading">
+              <h3 id="four-week-max-heading">Max of #2 and #3 (%)</h3>
+              <small>Max(next-high %, absolute next-low %)</small>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <div id="nextFourWeekMaxChart" class="histogram-box" role="img" aria-label="Per-week maximum of close to next four-week high percentage and absolute close to next four-week low percentage"></div>
+            <canvas id="distributionMonthlyMax" class="distribution-canvas" aria-label="Distribution histogram for monthly maximum metric" hidden></canvas>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const $ = (selector) => document.querySelector(selector);
+
+      const weeklyChartEl = $('#weeklyChart');
+      const monthlyChartEl = $('#monthlyChart');
+      const dailyChartEl = $('#dailyChart');
+      const annotationStore = new Map();
+      const chartContexts = new Map();
+      const svgNamespace = 'http://www.w3.org/2000/svg';
+      let activeSymbol = $('#symbol').value.trim().toUpperCase();
+
+      if (!window.LightweightCharts) {
+        $('#status').textContent = 'Chart library failed to load.';
+        $('#status').classList.add('error');
+        return;
+      }
+
+      function makeChart(el, timeframe) {
+        const chart = LightweightCharts.createChart(el, {
+          autoSize: true,
+          layout: {
+            background: { type: 'solid', color: '#ffffff' },
+            textColor: '#334155',
+            fontFamily: 'system-ui, sans-serif'
+          },
+          grid: {
+            vertLines: { color: '#e2e8f0' },
+            horzLines: { color: '#e2e8f0' }
+          },
+          rightPriceScale: {
+            borderColor: '#cbd5e1',
+            scaleMargins: { top: 0.08, bottom: 0.08 }
+          },
+          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+
+        const candleSeries = chart.addSeries(LightweightCharts.CandlestickSeries, {
+          upColor: '#138a63',
+          downColor: '#d94b58',
+          borderUpColor: '#138a63',
+          borderDownColor: '#d94b58',
+          wickUpColor: '#138a63',
+          wickDownColor: '#d94b58'
+        });
+
+        const ema20 = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#138a63', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+        });
+        const ema50 = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#c48600', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+        });
+        const sma200 = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#7654d6', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
+        });
+
+        const overlay = document.createElementNS(svgNamespace, 'svg');
+        overlay.classList.add('drawing-overlay');
+        overlay.setAttribute('aria-hidden', 'true');
+        el.append(overlay);
+
+        return {
+          chart, candleSeries, ema20, ema50, sma200, el, overlay, timeframe,
+          mode: 'select', selectedId: null, draft: null, drag: null
+        };
+      }
+
+      const weekly = makeChart(weeklyChartEl, 'weekly');
+      const monthly = makeChart(monthlyChartEl, 'monthly');
+      const daily = makeChart(dailyChartEl, 'daily');
+      for (const context of [weekly, monthly, daily]) {
+        chartContexts.set(context.timeframe, context);
+      }
+
+      function getAnnotations(context) {
+        const key = `${activeSymbol}:${context.timeframe}`;
+        if (!annotationStore.has(key)) annotationStore.set(key, []);
+        return annotationStore.get(key);
+      }
+
+      function createAnnotationId() {
+        return globalThis.crypto?.randomUUID?.() || `drawing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+
+      function createSvgElement(tagName, attributes = {}) {
+        const element = document.createElementNS(svgNamespace, tagName);
+        for (const [name, value] of Object.entries(attributes)) {
+          element.setAttribute(name, String(value));
         }
-    )
-    with urlopen(request, timeout=20) as response:
-        return json.loads(response.read())
+        return element;
+      }
 
+      function getChartPoint(context, time, x, y) {
+        const resolvedTime = time ?? context.chart.timeScale().coordinateToTime(x);
+        const price = context.candleSeries.coordinateToPrice(y);
+        if (resolvedTime === null || resolvedTime === undefined || !Number.isFinite(price)) return null;
+        return { time: resolvedTime, price };
+      }
 
-def fetch_full_daily_history(symbol):
-    # Yahoo's `range=max` silently changes daily data to monthly for long histories.
-    # Use that response only to discover the earliest available date, then fetch
-    # daily bars in sub-10-year windows and merge them by timestamp.
-    overview = fetch_yahoo_chart(symbol, {
-        "range": "max",
-        "interval": "1mo",
-        "events": "div,splits"
-    })
-    overview_result = (overview.get("chart", {}).get("result") or [None])[0]
-    if not overview_result or not overview_result.get("timestamp"):
-        return overview
+      function getPointCoordinates(context, point) {
+        const x = context.chart.timeScale().timeToCoordinate(point.time);
+        const y = context.candleSeries.priceToCoordinate(point.price);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return { x, y };
+      }
 
-    timestamps = overview_result["timestamp"]
-    start = min(timestamps)
-    end = max(timestamps) + 24 * 60 * 60
-    bars_by_timestamp = {}
-    latest_result = None
+      function getTrendlineCoordinates(context, annotation) {
+        const first = getPointCoordinates(context, annotation.points[0]);
+        const second = getPointCoordinates(context, annotation.points[1]);
+        if (!first || !second) return null;
 
-    for period_start in range(start, end, DAILY_CHUNK_SECONDS):
-        period_end = min(period_start + DAILY_CHUNK_SECONDS, end)
-        response_data = fetch_yahoo_chart(symbol, {
-            "period1": period_start,
-            "period2": period_end,
-            "interval": "1d",
-            "events": "div,splits"
-        })
-        chart = response_data.get("chart", {})
-        if chart.get("error"):
-            error = chart["error"]
-            raise RuntimeError(error.get("description") or error.get("code") or "Yahoo Finance error")
+        const start = first.x <= second.x ? first : second;
+        const other = first.x <= second.x ? second : first;
+        const plotWidth = getPlotWidth(context);
+        const canExtend = annotation.extendRight !== false &&
+          Math.abs(other.x - start.x) > 0.001 && plotWidth > other.x;
+        const end = canExtend
+          ? {
+            x: plotWidth,
+            y: start.y + ((plotWidth - start.x) * (other.y - start.y)) / (other.x - start.x)
+          }
+          : other;
+        return { first, second, start, end };
+      }
 
-        result = (chart.get("result") or [None])[0]
-        if not result or not result.get("timestamp"):
-            continue
+      function getPlotWidth(context) {
+        const priceScale = context.chart.priceScale('right');
+        const scaleWidth = typeof priceScale.width === 'function' ? priceScale.width() : 80;
+        return Math.max(0, context.el.clientWidth - scaleWidth);
+      }
 
-        quote = (result.get("indicators", {}).get("quote") or [{}])[0]
-        for index, timestamp in enumerate(result["timestamp"]):
-            bars_by_timestamp[timestamp] = {
-                key: values[index] if index < len(values) else None
-                for key, values in quote.items()
-                if isinstance(values, list)
+      function updateDrawingToolbar(context) {
+        const toolbar = document.querySelector(`[data-drawing-tools="${context.timeframe}"]`);
+        if (!toolbar) return;
+        for (const button of toolbar.querySelectorAll('[data-draw-mode]')) {
+          button.setAttribute('aria-pressed', String(button.dataset.drawMode === context.mode));
+        }
+        const deleteButton = toolbar.querySelector('[data-drawing-action="delete"]');
+        if (deleteButton) deleteButton.disabled = !context.selectedId;
+      }
+
+      function renderDrawingOverlay(context) {
+        const { overlay } = context;
+        const width = context.el.clientWidth;
+        const height = context.el.clientHeight;
+        overlay.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        overlay.replaceChildren();
+        overlay.dataset.active = String(context.mode !== 'select');
+
+        const annotations = getAnnotations(context);
+        const plotWidth = getPlotWidth(context);
+        for (const annotation of annotations) {
+          const isSelected = annotation.id === context.selectedId;
+          if (annotation.type === 'horizontal') {
+            const y = context.candleSeries.priceToCoordinate(annotation.price);
+            if (!Number.isFinite(y)) continue;
+            const line = createSvgElement('line', {
+              x1: 0, y1: y, x2: plotWidth, y2: y,
+              class: `drawing-line${isSelected ? ' selected' : ''}`,
+              'data-annotation-id': annotation.id
+            });
+            overlay.append(line);
+            if (isSelected) {
+              const handle = createSvgElement('circle', {
+                cx: plotWidth, cy: y, r: 6, class: 'drawing-handle',
+                'data-annotation-id': annotation.id, 'data-endpoint': 0
+              });
+              overlay.append(handle);
             }
-        latest_result = result
+            continue;
+          }
 
-    if not bars_by_timestamp or latest_result is None:
-        raise RuntimeError("Yahoo Finance returned no daily price history")
+          const coordinates = getTrendlineCoordinates(context, annotation);
+          if (!coordinates) continue;
+          overlay.append(createSvgElement('line', {
+            x1: coordinates.start.x, y1: coordinates.start.y,
+            x2: coordinates.end.x, y2: coordinates.end.y,
+            class: `drawing-line${isSelected ? ' selected' : ''}`,
+            'data-annotation-id': annotation.id
+          }));
+          if (isSelected) {
+            for (const [index, point] of [coordinates.first, coordinates.second].entries()) {
+              overlay.append(createSvgElement('circle', {
+                cx: point.x, cy: point.y, r: 6, class: 'drawing-handle',
+                'data-annotation-id': annotation.id, 'data-endpoint': index
+              }));
+            }
+          }
+        }
 
-    ordered_timestamps = sorted(bars_by_timestamp)
-    quote_fields = set().union(*(bar.keys() for bar in bars_by_timestamp.values()))
-    latest_result["timestamp"] = ordered_timestamps
-    latest_result.setdefault("indicators", {})["quote"] = [{
-        field: [bars_by_timestamp[timestamp].get(field) for timestamp in ordered_timestamps]
-        for field in quote_fields
-    }]
-    latest_result.setdefault("meta", {})["dataGranularity"] = "1d"
-    overview["chart"]["result"] = [latest_result]
-    overview["chart"]["error"] = None
-    return overview
+        if (context.draft?.type === 'trendline') {
+          const draftPoint = getPointCoordinates(context, context.draft.points[0]);
+          if (draftPoint) {
+            overlay.append(createSvgElement('circle', {
+              cx: draftPoint.x, cy: draftPoint.y, r: 5, class: 'drawing-handle'
+            }));
+          }
+        }
+      }
 
+      function selectAnnotationAt(context, point) {
+        const annotations = getAnnotations(context);
+        let closestId = null;
+        let closestDistance = 9;
+        for (const annotation of annotations) {
+          let distance = Infinity;
+          if (annotation.type === 'horizontal') {
+            const y = context.candleSeries.priceToCoordinate(annotation.price);
+            if (Number.isFinite(y)) distance = Math.abs(point.y - y);
+          } else {
+            const coordinates = getTrendlineCoordinates(context, annotation);
+            if (coordinates) {
+              const { start, end } = coordinates;
+              const dx = end.x - start.x;
+              const dy = end.y - start.y;
+              const lengthSquared = dx * dx + dy * dy;
+              const projection = lengthSquared
+                ? Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared))
+                : 0;
+              distance = Math.hypot(point.x - (start.x + projection * dx), point.y - (start.y + projection * dy));
+            }
+          }
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestId = annotation.id;
+          }
+        }
+        context.selectedId = closestId;
+        updateDrawingToolbar(context);
+        renderDrawingOverlay(context);
+      }
 
-class Handler(SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=str(WEB_ROOT), **kwargs)
+      function attachDrawingInteractions(context) {
+        const toolbar = document.querySelector(`[data-drawing-tools="${context.timeframe}"]`);
+        toolbar?.addEventListener('click', (event) => {
+          const button = event.target.closest('button');
+          if (!button) return;
 
-    def do_GET(self):
-        path = urlparse(self.path).path
-        if path == "/healthz":
-            return self.send_json(200, {"status": "ok"})
-        if path in {"/", "/ema-candlestick-chart.html"}:
-            return self.send_chart_page()
-        if path != "/api/chart":
-            return self.send_json(404, {"error": "Not found"})
+          if (button.dataset.drawMode) {
+            context.mode = button.dataset.drawMode;
+            context.draft = null;
+            context.selectedId = null;
+          } else if (button.dataset.drawingAction === 'delete') {
+            const annotations = getAnnotations(context);
+            const index = annotations.findIndex((annotation) => annotation.id === context.selectedId);
+            if (index >= 0) annotations.splice(index, 1);
+            context.selectedId = null;
+          } else if (button.dataset.drawingAction === 'clear') {
+            getAnnotations(context).splice(0);
+            context.selectedId = null;
+            context.draft = null;
+          }
+          updateDrawingToolbar(context);
+          renderDrawingOverlay(context);
+        });
 
-        params = parse_qs(urlparse(self.path).query)
-        symbol = params.get("symbol", [""])[0].upper()
-        period = params.get("range", ["1y"])[0]
+        context.chart.subscribeClick((param) => {
+          if (!param.point) return;
+          if (context.mode === 'select') {
+            selectAnnotationAt(context, param.point);
+            return;
+          }
 
-        if not re.fullmatch(r"[A-Z0-9^=._-]{1,20}", symbol):
-            return self.send_json(400, {"error": "Invalid ticker symbol"})
+          const anchor = getChartPoint(context, param.time, param.point.x, param.point.y);
+          if (!anchor) return;
+          const annotations = getAnnotations(context);
+          if (context.mode === 'horizontal') {
+            const annotation = { id: createAnnotationId(), type: 'horizontal', price: anchor.price };
+            annotations.push(annotation);
+            context.selectedId = annotation.id;
+            context.mode = 'select';
+          } else if (!context.draft) {
+            context.draft = { type: 'trendline', points: [anchor] };
+          } else {
+            const annotation = {
+              id: createAnnotationId(),
+              type: 'trendline',
+              extendRight: true,
+              points: [context.draft.points[0], anchor]
+            };
+            annotations.push(annotation);
+            context.selectedId = annotation.id;
+            context.draft = null;
+            context.mode = 'select';
+          }
+          updateDrawingToolbar(context);
+          renderDrawingOverlay(context);
+        });
 
-        if period not in VALID_RANGES:
-            return self.send_json(400, {"error": "Invalid history range"})
+        context.overlay.addEventListener('pointerdown', (event) => {
+          const handle = event.target.closest('[data-annotation-id][data-endpoint]');
+          if (!handle) return;
+          context.drag = {
+            id: handle.dataset.annotationId,
+            endpoint: Number(handle.dataset.endpoint)
+          };
+          event.preventDefault();
+          event.stopPropagation();
+        });
 
-        try:
-            if period == "max":
-                data = fetch_full_daily_history(symbol)
-            else:
-                data = fetch_yahoo_chart(symbol, {
-                    "range": period,
-                    "interval": "1d",
-                    "events": "div,splits"
-                })
-            body = json.dumps(data).encode("utf-8")
+        window.addEventListener('pointermove', (event) => {
+          if (!context.drag) return;
+          const rect = context.el.getBoundingClientRect();
+          const annotation = getAnnotations(context).find((item) => item.id === context.drag.id);
+          if (!annotation) return;
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          if (annotation.type === 'horizontal') {
+            const price = context.candleSeries.coordinateToPrice(y);
+            if (!Number.isFinite(price)) return;
+            annotation.price = price;
+          } else {
+            const point = getChartPoint(context, null, x, y);
+            if (!point) return;
+            annotation.points[context.drag.endpoint] = point;
+          }
+          renderDrawingOverlay(context);
+        });
+        const stopDragging = () => { context.drag = null; };
+        window.addEventListener('pointerup', stopDragging);
+        window.addEventListener('pointercancel', stopDragging);
 
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+        context.chart.timeScale().subscribeVisibleLogicalRangeChange(() => renderDrawingOverlay(context));
+        context.resizeObserver = new ResizeObserver(() => renderDrawingOverlay(context));
+        context.resizeObserver.observe(context.el);
+        context.el.addEventListener('wheel', () => requestAnimationFrame(() => renderDrawingOverlay(context)), { passive: true });
+        context.el.addEventListener('pointerup', () => requestAnimationFrame(() => renderDrawingOverlay(context)));
+        updateDrawingToolbar(context);
+        renderDrawingOverlay(context);
+      }
 
-        except HTTPError as error:
-            self.send_json(
-                502,
-                {"error": f"Yahoo Finance returned HTTP {error.code}"}
-            )
-        except Exception as error:
-            self.send_json(
-                502,
-                {"error": f"Could not fetch Yahoo data: {error}"}
-            )
+      for (const context of chartContexts.values()) attachDrawingInteractions(context);
 
-    def send_json(self, status, data):
-        body = json.dumps(data).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
-        self.end_headers()
-        self.wfile.write(body)
+      window.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape') return;
+        for (const context of chartContexts.values()) {
+          if (!context.draft) continue;
+          context.draft = null;
+          renderDrawingOverlay(context);
+        }
+      });
 
+      function refreshDrawingOverlays() {
+        for (const context of chartContexts.values()) {
+          context.selectedId = null;
+          context.draft = null;
+          updateDrawingToolbar(context);
+          renderDrawingOverlay(context);
+        }
+      }
 
-    def send_chart_page(self):
-        chart_path = WEB_ROOT / "ema-candlestick-chart.html"
-        body = chart_path.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-cache")
-        self.end_headers()
-        self.wfile.write(body)
+      function makeHistogramChart(el, color) {
+        const chart = LightweightCharts.createChart(el, {
+          autoSize: true,
+          layout: {
+            background: { type: 'solid', color: '#ffffff' },
+            textColor: '#334155',
+            fontFamily: 'system-ui, sans-serif'
+          },
+          grid: {
+            vertLines: { color: '#e2e8f0' },
+            horzLines: { color: '#e2e8f0' }
+          },
+          rightPriceScale: { borderColor: '#cbd5e1' },
+          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+        const series = chart.addSeries(LightweightCharts.HistogramSeries, {
+          color,
+          priceLineVisible: false,
+          priceFormat: {
+            type: 'custom',
+            minMove: 0.01,
+            formatter: (value) => `${value.toFixed(2)}%`
+          }
+        });
+        return { chart, series };
+      }
 
+      const nextWeekHighHistogram = makeHistogramChart($('#nextWeekHighChart'), '#c48600');
+      const nextWeekLowHistogram = makeHistogramChart($('#nextWeekLowChart'), '#7654d6');
+      const nextWeekMaxHistogram = makeHistogramChart($('#nextWeekMaxChart'), '#3478c8');
+      const nextFourWeekHighHistogram = makeHistogramChart($('#nextFourWeekHighChart'), '#c48600');
+      const nextFourWeekLowHistogram = makeHistogramChart($('#nextFourWeekLowChart'), '#7654d6');
+      const nextFourWeekMaxHistogram = makeHistogramChart($('#nextFourWeekMaxChart'), '#3478c8');
+      const metricViews = {
+        weeklyHigh: {
+          histogram: nextWeekHighHistogram,
+          barElement: $('#nextWeekHighChart'),
+          canvas: $('#distributionWeeklyHigh'),
+          color: '#c48600', negativeColor: '#d94b58', points: [], distributionChart: null
+        },
+        weeklyLow: {
+          histogram: nextWeekLowHistogram,
+          barElement: $('#nextWeekLowChart'),
+          canvas: $('#distributionWeeklyLow'),
+          color: '#7654d6', points: [], distributionChart: null
+        },
+        weeklyMax: {
+          histogram: nextWeekMaxHistogram,
+          barElement: $('#nextWeekMaxChart'),
+          canvas: $('#distributionWeeklyMax'),
+          color: '#3478c8', points: [], distributionChart: null
+        },
+        monthlyHigh: {
+          histogram: nextFourWeekHighHistogram,
+          barElement: $('#nextFourWeekHighChart'),
+          canvas: $('#distributionMonthlyHigh'),
+          color: '#c48600', negativeColor: '#d94b58', points: [], distributionChart: null
+        },
+        monthlyLow: {
+          histogram: nextFourWeekLowHistogram,
+          barElement: $('#nextFourWeekLowChart'),
+          canvas: $('#distributionMonthlyLow'),
+          color: '#7654d6', points: [], distributionChart: null
+        },
+        monthlyMax: {
+          histogram: nextFourWeekMaxHistogram,
+          barElement: $('#nextFourWeekMaxChart'),
+          canvas: $('#distributionMonthlyMax'),
+          color: '#3478c8', points: [], distributionChart: null
+        }
+      };
+      const metricSections = {
+        weekly: {
+          toggle: $('#weekly-view-toggle'),
+          views: ['weeklyHigh', 'weeklyLow', 'weeklyMax'].map((key) => metricViews[key]),
+          showHistogram: false
+        },
+        monthly: {
+          toggle: $('#monthly-view-toggle'),
+          views: ['monthlyHigh', 'monthlyLow', 'monthlyMax'].map((key) => metricViews[key]),
+          showHistogram: false
+        }
+      };
+      let activeRequest = null;
 
-HOST = "0.0.0.0"
-server = ThreadingHTTPServer((HOST, int(os.environ.get("PORT", PORT))), Handler)
+      function buildDistribution(values) {
+        if (!values.length) return { labels: [], counts: [], centers: [] };
 
-print(f"Chart server listening on {HOST}:{server.server_port}")
+        let min = Math.min(...values);
+        let max = Math.max(...values);
+        if (min === max) {
+          const padding = Math.max(Math.abs(min) * 0.05, 0.25);
+          min -= padding;
+          max += padding;
+        }
 
-server.serve_forever()
+        const binCount = Math.min(20, Math.max(5, Math.ceil(Math.sqrt(values.length))));
+        const binWidth = (max - min) / binCount;
+        const counts = Array(binCount).fill(0);
+        for (const value of values) {
+          const index = Math.min(binCount - 1, Math.floor((value - min) / binWidth));
+          counts[index]++;
+        }
+
+        const digits = binWidth < 0.1 ? 2 : 1;
+        const bins = counts.map((count, index) => {
+          const lower = min + index * binWidth;
+          const upper = min + (index + 1) * binWidth;
+          return {
+            count,
+            center: min + (index + 0.5) * binWidth,
+            label: `${lower.toFixed(digits)}–${upper.toFixed(digits)}%`
+          };
+        });
+        bins.sort((a, b) => a.center - b.center);
+        return {
+          labels: bins.map((bin) => bin.label),
+          counts: bins.map((bin) => bin.count),
+          centers: bins.map((bin) => bin.center)
+        };
+      }
+
+      function renderDistribution(view) {
+        const { labels, counts, centers } = buildDistribution(
+          view.points.map((point) => point.value).filter(Number.isFinite)
+        );
+        const data = {
+          labels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Weeks',
+              data: counts,
+              backgroundColor: centers.map((center) => (
+                view.negativeColor && center < 0 ? view.negativeColor : view.color
+              )),
+              borderColor: centers.map((center) => (
+                view.negativeColor && center < 0 ? view.negativeColor : view.color
+              )),
+              borderWidth: 1,
+              yAxisID: 'y'
+            }
+          ]
+        };
+
+        if (!view.distributionChart) {
+          view.distributionChart = new Chart(view.canvas, {
+            type: 'bar',
+            data,
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  callbacks: {
+                    title: (items) => items[0]?.label || '',
+                    label: (item) => `${item.parsed.y} weeks`
+                  }
+                }
+              },
+              scales: {
+                x: {
+                  title: { display: true, text: 'Metric value (%)', color: '#475569' },
+                  ticks: {
+                    color: '#334155',
+                    autoSkip: true,
+                    maxTicksLimit: 5,
+                    maxRotation: 0,
+                    minRotation: 0,
+                    font: { size: 9 }
+                  },
+                  grid: { color: '#e2e8f0' }
+                },
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: 'Number of weeks', color: '#475569' },
+                  ticks: {
+                    color: '#334155',
+                    precision: 0,
+                    maxTicksLimit: 5,
+                    font: { size: 10 },
+                    padding: 6
+                  },
+                  grid: { color: '#e2e8f0' }
+                }
+              }
+            }
+          });
+        } else {
+          view.distributionChart.data = data;
+          view.distributionChart.update('none');
+        }
+      }
+
+      function setMetricPoints(view, points) {
+        view.points = points;
+        view.histogram.series.setData(points);
+        if (!view.canvas.hidden && window.Chart) renderDistribution(view);
+      }
+
+      for (const section of Object.values(metricSections)) {
+        section.toggle.addEventListener('click', () => {
+          const showDistribution = !section.showHistogram;
+          if (showDistribution && !window.Chart) {
+            $('#status').textContent = 'Histogram library failed to load; check your connection and reload.';
+            $('#status').classList.add('error');
+            return;
+          }
+
+          section.showHistogram = showDistribution;
+          section.toggle.textContent = showDistribution ? 'Show time series' : 'Show histogram';
+          section.toggle.setAttribute('aria-pressed', String(showDistribution));
+          for (const view of section.views) {
+            view.canvas.hidden = !showDistribution;
+            view.barElement.hidden = showDistribution;
+            if (showDistribution) renderDistribution(view);
+          }
+        });
+      }
+
+      function ema(values, period) {
+        const averages = Array(values.length).fill(null);
+        if (!Number.isInteger(period) || period <= 0 || values.length < period) return averages;
+
+        const k = 2 / (period + 1);
+        let prev = values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
+        averages[period - 1] = prev;
+
+        for (let i = period; i < values.length; i++) {
+          prev = values[i] * k + prev * (1 - k);
+          averages[i] = prev;
+        }
+        return averages;
+      }
+
+      function sma(values, period) {
+        const averages = Array(values.length).fill(null);
+        if (!Number.isInteger(period) || period <= 0) return averages;
+
+        let sum = 0;
+        for (let i = 0; i < values.length; i++) {
+          sum += values[i];
+          if (i >= period) sum -= values[i - period];
+          if (i >= period - 1) averages[i] = sum / period;
+        }
+        return averages;
+      }
+
+      function getWeekStart(dateString) {
+        const d = new Date(dateString + 'T00:00:00Z');
+        const day = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() - (day - 1));
+        return d.toISOString().slice(0, 10);
+      }
+
+      function getRangeStartDate(range, latestDate) {
+        const monthsByRange = { '6mo': 6, '1y': 12, '2y': 24, '5y': 60, '10y': 120 };
+        const months = monthsByRange[range];
+        if (!months) return null;
+
+        const [year, month, day] = latestDate.split('-').map(Number);
+        const targetMonthIndex = year * 12 + month - 1 - months;
+        const targetYear = Math.floor(targetMonthIndex / 12);
+        const targetMonth = (targetMonthIndex % 12 + 12) % 12;
+        const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+        return new Date(Date.UTC(targetYear, targetMonth, Math.min(day, lastDay)))
+          .toISOString()
+          .slice(0, 10);
+      }
+
+      function aggregateRows(rows, mode) {
+        const map = new Map();
+
+        for (const row of rows) {
+          const key = mode === 'weekly'
+            ? getWeekStart(row.date)
+            : new Date(row.date.slice(0, 7) + '-01T00:00:00Z').toISOString().slice(0, 10);
+
+          if (!map.has(key)) {
+            map.set(key, {
+              time: key,
+              open: row.open,
+              high: row.high,
+              low: row.low,
+              close: row.close
+            });
+          } else {
+            const current = map.get(key);
+            current.high = Math.max(current.high, row.high);
+            current.low = Math.min(current.low, row.low);
+            current.close = row.close;
+          }
+        }
+
+        return Array.from(map.values()).sort((a, b) => a.time.localeCompare(b.time));
+      }
+
+      function toCandlePoints(rows) {
+        return rows.map((row) => ({
+          time: row.time || row.date,
+          open: row.open,
+          high: row.high,
+          low: row.low,
+          close: row.close
+        }));
+      }
+
+      function buildLineSeries(series, points) {
+        series.setData(points.filter((p) => Number.isFinite(p.value)));
+      }
+
+      function buildMoveSeries(closeValues, timeLabels, period) {
+        const values = ema(closeValues, period);
+        return closeValues.map((_, i) => ({ time: timeLabels[i].time || timeLabels[i].date, value: values[i] }));
+      }
+
+      function formatOutput(value, currency) {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency,
+          maximumFractionDigits: 2
+        }).format(value);
+      }
+
+      function clearChartData() {
+        for (const data of [weekly, monthly, daily]) {
+          data.candleSeries.setData([]);
+          data.ema20.setData([]);
+          data.ema50.setData([]);
+          data.sma200.setData([]);
+        }
+        for (const view of Object.values(metricViews)) {
+          view.points = [];
+          view.histogram.series.setData([]);
+          if (view.distributionChart) renderDistribution(view);
+        }
+      }
+
+      function buildWeeklyMetrics(rows) {
+        const nextWeekHigh = [];
+        const nextWeekLow = [];
+        const nextWeekMax = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const current = rows[i];
+          const next = rows[i + 1];
+          if (!next || current.close <= 0) continue;
+
+          const highPercent = ((next.high - current.close) / current.close) * 100;
+          const lowPercent = ((next.low - current.close) / current.close) * 100;
+          nextWeekHigh.push({ time: current.time, value: highPercent });
+          nextWeekLow.push({ time: current.time, value: lowPercent });
+          nextWeekMax.push({ time: current.time, value: Math.max(highPercent, Math.abs(lowPercent)) });
+        }
+
+        return { nextWeekHigh, nextWeekLow, nextWeekMax };
+      }
+
+      function buildMonthlyMetrics(rows) {
+        const nextFourWeekHigh = [];
+        const nextFourWeekLow = [];
+        const nextFourWeekMax = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const current = rows[i];
+          if (i + 4 >= rows.length || current.close <= 0) continue;
+          const forwardWindow = rows.slice(i + 1, i + 5);
+          const highPercent = ((Math.max(...forwardWindow.map((row) => row.high)) - current.close) / current.close) * 100;
+          const lowPercent = ((Math.min(...forwardWindow.map((row) => row.low)) - current.close) / current.close) * 100;
+          nextFourWeekHigh.push({ time: current.time, value: highPercent });
+          nextFourWeekLow.push({ time: current.time, value: lowPercent });
+          nextFourWeekMax.push({ time: current.time, value: Math.max(highPercent, Math.abs(lowPercent)) });
+        }
+
+        return { nextFourWeekHigh, nextFourWeekLow, nextFourWeekMax };
+      }
+
+      async function loadChart() {
+        if (activeRequest) {
+          activeRequest.abort();
+          activeRequest = null;
+        }
+
+        const symbol = $('#symbol').value.trim().toUpperCase();
+        const range = $('#range').value;
+
+        if (!symbol) {
+          $('#status').textContent = 'Please enter a ticker.';
+          $('#status').classList.add('error');
+          $('#load').disabled = false;
+          return;
+        }
+
+        if (activeSymbol !== symbol) {
+          activeSymbol = symbol;
+          refreshDrawingOverlays();
+        }
+
+        const controller = new AbortController();
+        activeRequest = controller;
+        clearChartData();
+        $('#status').classList.remove('error');
+        $('#status').textContent = `Fetching full history for ${symbol}…`;
+        $('#load').disabled = true;
+
+        try {
+          const response = await fetch(
+            `/api/chart?symbol=${encodeURIComponent(symbol)}&range=max`,
+            { signal: controller.signal }
+          );
+          let json;
+          try {
+            json = await response.json();
+          } catch (error) {
+            if (controller.signal.aborted) throw error;
+            throw new Error('Server returned invalid JSON.');
+          }
+          if (controller.signal.aborted) return;
+
+          if (!response.ok) {
+            throw new Error(json?.error || `Server error ${response.status}`);
+          }
+
+          if (json?.chart?.error) {
+            throw new Error(json.chart.error.description || json.chart.error.code || 'Price service error.');
+          }
+
+          const result = json?.chart?.result?.[0];
+          if (!result) throw new Error('No price history returned.');
+          if (result.meta?.dataGranularity && result.meta.dataGranularity !== '1d') {
+            throw new Error('The server returned non-daily data. Restart the chart server to load full daily history.');
+          }
+
+          const quote = result.indicators?.quote?.[0];
+          const requiredFields = ['open', 'high', 'low', 'close'];
+          if (
+            !Array.isArray(result.timestamp) ||
+            !quote ||
+            !requiredFields.every((field) => Array.isArray(quote[field]))
+          ) {
+            throw new Error('Price data response is incomplete.');
+          }
+
+          let marketDateFormatter;
+          try {
+            marketDateFormatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: result.meta?.exchangeTimezoneName || 'UTC',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          } catch {
+            marketDateFormatter = new Intl.DateTimeFormat('en-US', {
+              timeZone: 'UTC',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            });
+          }
+
+          const rowsByDate = new Map();
+
+          for (let i = 0; i < result.timestamp.length; i++) {
+            const timestamp = result.timestamp[i];
+            const open = quote.open[i];
+            const high = quote.high[i];
+            const low = quote.low[i];
+            const close = quote.close[i];
+            if (![timestamp, open, high, low, close].every(Number.isFinite)) continue;
+            if (high < low || high < Math.max(open, close) || low > Math.min(open, close)) continue;
+
+            const date = new Date(timestamp * 1000);
+            if (!Number.isFinite(date.getTime())) continue;
+            const dateParts = Object.fromEntries(
+              marketDateFormatter.formatToParts(date).map(({ type, value }) => [type, value])
+            );
+
+            const dateKey = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+            const current = rowsByDate.get(dateKey);
+            if (!current) {
+              rowsByDate.set(dateKey, {
+                date: dateKey,
+                open,
+                high,
+                low,
+                close,
+                firstTimestamp: timestamp,
+                lastTimestamp: timestamp
+              });
+            } else {
+              current.high = Math.max(current.high, high);
+              current.low = Math.min(current.low, low);
+              if (timestamp < current.firstTimestamp) {
+                current.open = open;
+                current.firstTimestamp = timestamp;
+              }
+              if (timestamp >= current.lastTimestamp) {
+                current.close = close;
+                current.lastTimestamp = timestamp;
+              }
+            }
+          }
+
+          const rows = Array.from(
+            rowsByDate.values(),
+            ({ firstTimestamp, lastTimestamp, ...row }) => row
+          );
+          if (!rows.length) throw new Error('No valid price bars were returned.');
+          rows.sort((a, b) => a.date.localeCompare(b.date));
+
+          const allDailyRows = rows.map((row) => ({
+            time: row.date,
+            open: row.open,
+            high: row.high,
+            low: row.low,
+            close: row.close
+          }));
+
+          const allWeeklyRows = aggregateRows(rows, 'weekly');
+          const allMonthlyRows = aggregateRows(rows, 'monthly');
+          const visibleStart = getRangeStartDate(range, rows.at(-1).date);
+          const weeklyStart = visibleStart ? getWeekStart(visibleStart) : null;
+          const monthlyStart = visibleStart ? `${visibleStart.slice(0, 7)}-01` : null;
+          const dailyRows = allDailyRows.filter((row) => !visibleStart || row.time >= visibleStart);
+          const weeklyRows = allWeeklyRows.filter((row) => !weeklyStart || row.time >= weeklyStart);
+          const monthlyRows = allMonthlyRows.filter((row) => !monthlyStart || row.time >= monthlyStart);
+
+          if (!dailyRows.length) throw new Error('No price bars fall within the selected display range.');
+
+          weekly.candleSeries.setData(toCandlePoints(weeklyRows));
+          monthly.candleSeries.setData(toCandlePoints(monthlyRows));
+          daily.candleSeries.setData(toCandlePoints(dailyRows));
+
+          const weeklyMetrics = buildWeeklyMetrics(allWeeklyRows);
+          setMetricPoints(
+            metricViews.weeklyLow,
+            weeklyMetrics.nextWeekLow.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(
+            metricViews.weeklyMax,
+            weeklyMetrics.nextWeekMax.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(metricViews.weeklyHigh,
+            weeklyMetrics.nextWeekHigh
+              .filter((point) => !weeklyStart || point.time >= weeklyStart)
+              .map((point) => ({
+                ...point,
+                color: point.value < 0 ? '#d94b58' : '#c48600'
+              }))
+          );
+
+          const monthlyMetrics = buildMonthlyMetrics(allWeeklyRows);
+          setMetricPoints(
+            metricViews.monthlyLow,
+            monthlyMetrics.nextFourWeekLow.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(
+            metricViews.monthlyMax,
+            monthlyMetrics.nextFourWeekMax.filter((point) => !weeklyStart || point.time >= weeklyStart)
+          );
+          setMetricPoints(metricViews.monthlyHigh,
+            monthlyMetrics.nextFourWeekHigh
+              .filter((point) => !weeklyStart || point.time >= weeklyStart)
+              .map((point) => ({
+                ...point,
+                color: point.value < 0 ? '#d94b58' : '#c48600'
+              }))
+          );
+
+          const dailyCloses = allDailyRows.map((row) => row.close);
+          const weeklyCloses = allWeeklyRows.map((row) => row.close);
+          const monthlyCloses = allMonthlyRows.map((row) => row.close);
+          const dailySma200 = sma(dailyCloses, 200);
+          const weeklySma200 = sma(weeklyCloses, 200);
+          const monthlySma200 = sma(monthlyCloses, 200);
+
+          buildLineSeries(weekly.ema20, buildMoveSeries(weeklyCloses, allWeeklyRows, 20)
+            .filter((point) => !weeklyStart || point.time >= weeklyStart));
+          buildLineSeries(weekly.ema50, buildMoveSeries(weeklyCloses, allWeeklyRows, 50)
+            .filter((point) => !weeklyStart || point.time >= weeklyStart));
+          buildLineSeries(weekly.sma200, allWeeklyRows.map((row, i) => ({
+            time: row.time,
+            value: weeklySma200[i]
+          })).filter((point) => !weeklyStart || point.time >= weeklyStart));
+
+          buildLineSeries(monthly.ema20, buildMoveSeries(monthlyCloses, allMonthlyRows, 20)
+            .filter((point) => !monthlyStart || point.time >= monthlyStart));
+          buildLineSeries(monthly.ema50, buildMoveSeries(monthlyCloses, allMonthlyRows, 50)
+            .filter((point) => !monthlyStart || point.time >= monthlyStart));
+          buildLineSeries(monthly.sma200, allMonthlyRows.map((row, i) => ({
+            time: row.time,
+            value: monthlySma200[i]
+          })).filter((point) => !monthlyStart || point.time >= monthlyStart));
+
+          buildLineSeries(daily.ema20, buildMoveSeries(dailyCloses, allDailyRows, 20)
+            .filter((point) => !visibleStart || point.time >= visibleStart));
+          buildLineSeries(daily.ema50, buildMoveSeries(dailyCloses, allDailyRows, 50)
+            .filter((point) => !visibleStart || point.time >= visibleStart));
+          buildLineSeries(daily.sma200, allDailyRows.map((row, i) => ({
+            time: row.time,
+            value: dailySma200[i]
+          })).filter((point) => !visibleStart || point.time >= visibleStart));
+
+          const last = rows.at(-1);
+          const prev = rows.at(-2);
+          const changePct = prev && prev.close !== 0
+            ? ((last.close / prev.close) - 1) * 100
+            : null;
+          const changeText = changePct === null
+            ? ''
+            : ` (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
+          const currency = /^[A-Z]{3}$/.test(result.meta?.currency || '')
+            ? result.meta.currency
+            : 'USD';
+          const warmingUp = [
+            ['daily', allDailyRows.length],
+            ['weekly', allWeeklyRows.length],
+            ['monthly', allMonthlyRows.length]
+          ]
+            .map(([timeframe, count]) => {
+              const missing = [];
+              if (count < 20) missing.push('EMA 20');
+              if (count < 50) missing.push('EMA 50');
+              if (count < 200) missing.push('SMA 200');
+              return missing.length ? `${timeframe} ${count} bars (${missing.join('/')})` : null;
+            })
+            .filter(Boolean);
+          const averageStatus = warmingUp.length
+            ? ` · Waiting for enough bars: ${warmingUp.join('; ')}`
+            : '';
+          const displayStatus = range === 'max' ? 'all history displayed' : `${range} displayed`;
+
+          $('#status').textContent = `${symbol} — ${displayStatus}; averages use all available history · Last ${formatOutput(last.close, currency)}${changeText}${averageStatus}`;
+          weekly.chart.timeScale().fitContent();
+          monthly.chart.timeScale().fitContent();
+          daily.chart.timeScale().fitContent();
+          for (const view of Object.values(metricViews)) {
+            view.histogram.chart.timeScale().fitContent();
+          }
+          for (const context of chartContexts.values()) renderDrawingOverlay(context);
+        } catch (error) {
+          if (error?.name !== 'AbortError') {
+            $('#status').textContent = error instanceof Error ? error.message : 'Unable to load chart data.';
+            $('#status').classList.add('error');
+          }
+        } finally {
+          if (activeRequest === controller) {
+            activeRequest = null;
+            $('#load').disabled = false;
+          }
+        }
+      }
+
+      $('#form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        loadChart();
+      });
+
+      loadChart();
+    })();
+  </script>
+</body>
+</html>
