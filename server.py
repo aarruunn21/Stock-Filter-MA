@@ -15,8 +15,8 @@ PORT = 8765
 VALID_RANGES = {"6mo", "1y", "2y", "5y", "10y", "max"}
 WEB_ROOT = Path(__file__).resolve().parent
 YAHOO_HOSTS = [
-    "https://yahoo.com",
-    "https://yahoo.com",
+    "https://query1.finance.yahoo.com",
+    "https://query2.finance.yahoo.com",
 ]
 DAILY_CHUNK_SECONDS = 9 * 365 * 24 * 60 * 60
 CACHE_TTL_SECONDS = 300
@@ -70,10 +70,10 @@ def get_yahoo_session(force_refresh=False):
             ("Accept-Language", "en-US,en;q=0.9"),
         ]
 
-        # Step 1: Collect Yahoo consent/session cookies (://yahoo.com often returns 404 while setting cookies)
+        # Step 1: Collect Yahoo session cookies; this endpoint may return 404.
         try:
-            opener.open("https://://yahoo.com", timeout=15).read()
-        except HTTPError:
+            opener.open("https://fc.yahoo.com", timeout=15).read()
+        except OSError:
             pass
 
         # Step 2: Request the crumb tied to those cookies
@@ -132,7 +132,7 @@ def fetch_full_daily_history(symbol):
     overview = fetch_yahoo_chart(
         symbol, {"range": "max", "interval": "1mo", "events": "div,splits"}
     )
-    overview_result = (overview.get("chart", {}).get("result") or [None])
+    overview_result = (overview.get("chart", {}).get("result") or [None])[0]
     if not overview_result or not overview_result.get("timestamp"):
         return overview
 
@@ -161,11 +161,11 @@ def fetch_full_daily_history(symbol):
                 or error.get("code")
                 or "Yahoo Finance error"
             )
-        result = (chart.get("result") or [None])
+        result = (chart.get("result") or [None])[0]
         if not result or not result.get("timestamp"):
             continue
 
-        quote = (result.get("indicators", {}).get("quote") or [{}])
+        quote = (result.get("indicators", {}).get("quote") or [{}])[0]
         for index, timestamp in enumerate(result["timestamp"]):
             bars_by_timestamp[timestamp] = {
                 key: values[index] if index < len(values) else None
@@ -214,8 +214,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(404, {"error": "Not found"})
 
         params = parse_qs(urlparse(self.path).query)
-        symbol = params.get("symbol", [""]).upper()
-        period = params.get("range", ["1y"])
+        symbol = params.get("symbol", [""])[0].strip().upper()
+        period = params.get("range", ["1y"])[0]
 
         if not re.fullmatch(r"[A-Z0-9^=._-]{1,20}", symbol):
             return self.send_json(400, {"error": "Invalid ticker symbol"})
@@ -284,3 +284,12 @@ if __name__ == "__main__":
     )
 
     def shutdown_handler(signum, frame):
+        _ = signum, frame
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
