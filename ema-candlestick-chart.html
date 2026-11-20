@@ -159,6 +159,25 @@
       border-radius: 0;
     }
     .chart-panel:fullscreen .panel-header { flex: 0 0 auto; }
+    .chart-panel:fullscreen .panel-header {
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+    }
+    .fullscreen-controls {
+      display: none;
+      align-items: end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .chart-panel:fullscreen .fullscreen-controls { display: flex; }
+    .fullscreen-controls label { margin-bottom: 4px; }
+    .fullscreen-controls input,
+    .fullscreen-controls select,
+    .fullscreen-controls button { height: 34px; }
+    .fullscreen-controls input { width: 120px; text-transform: uppercase; }
+    .fullscreen-controls select { min-width: 120px; }
+    .fullscreen-controls button { padding: 0 14px; }
     .chart-panel:fullscreen .chart-wrap {
       flex: 1 1 auto;
       min-height: 0;
@@ -252,6 +271,22 @@
       vector-effect: non-scaling-stroke;
     }
     .drawing-line.selected { stroke: #1769c2; stroke-width: 3; }
+    .fibonacci-line {
+      stroke: #687586;
+      stroke-width: 1.5;
+      stroke-dasharray: 4 3;
+      vector-effect: non-scaling-stroke;
+    }
+    .fibonacci-line.selected { stroke: #1769c2; stroke-width: 2.5; }
+    .fibonacci-label {
+      fill: #475569;
+      font: 11px system-ui, sans-serif;
+      paint-order: stroke;
+      stroke: #fff;
+      stroke-width: 3px;
+      stroke-linejoin: round;
+      pointer-events: none;
+    }
     .drawing-handle {
       fill: #fff;
       stroke: #1769c2;
@@ -300,7 +335,7 @@
     <div class="topbar">
       <div>
         <div class="sub">MARKET STRUCTURE · TREND FILTER</div>
-        <h1>Daily, Weekly &amp; Monthly Moving Averages</h1>
+        <h1>Charts</h1>
       </div>
 
       <form id="form" class="controls">
@@ -338,10 +373,29 @@
             <h2 id="weekly-heading">Weekly chart</h2>
             <small>EMA 20 / EMA 50 / SMA 200</small>
           </div>
+          <div class="fullscreen-controls" data-fullscreen-controls="weekly" aria-label="Load a ticker on the weekly chart">
+            <div>
+              <label>Ticker</label>
+              <input type="text" data-fullscreen-field="symbol" maxlength="20" autocomplete="off" required>
+            </div>
+            <div>
+              <label>History</label>
+              <select data-fullscreen-field="range">
+                <option value="6mo">6 months</option>
+                <option value="1y">1 year</option>
+                <option value="2y">2 years</option>
+                <option value="5y">5 years</option>
+                <option value="10y">10 years</option>
+                <option value="max">Max</option>
+              </select>
+            </div>
+            <button type="button" data-fullscreen-load>Load chart</button>
+          </div>
           <div class="drawing-tools" data-drawing-tools="weekly" aria-label="Weekly chart drawing tools">
             <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
             <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
             <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+            <button type="button" data-draw-mode="fibonacci" aria-pressed="false">Fib retracement</button>
             <button type="button" data-drawing-action="delete" disabled>Delete</button>
             <button type="button" data-drawing-action="clear">Clear</button>
             <button type="button" data-fullscreen-toggle aria-label="Pop out weekly chart">Pop out</button>
@@ -362,10 +416,29 @@
             <h2 id="monthly-heading">Monthly chart</h2>
             <small>EMA 20 / EMA 50 / SMA 200</small>
           </div>
+          <div class="fullscreen-controls" data-fullscreen-controls="monthly" aria-label="Load a ticker on the monthly chart">
+            <div>
+              <label>Ticker</label>
+              <input type="text" data-fullscreen-field="symbol" maxlength="20" autocomplete="off" required>
+            </div>
+            <div>
+              <label>History</label>
+              <select data-fullscreen-field="range">
+                <option value="6mo">6 months</option>
+                <option value="1y">1 year</option>
+                <option value="2y">2 years</option>
+                <option value="5y">5 years</option>
+                <option value="10y">10 years</option>
+                <option value="max">Max</option>
+              </select>
+            </div>
+            <button type="button" data-fullscreen-load>Load chart</button>
+          </div>
           <div class="drawing-tools" data-drawing-tools="monthly" aria-label="Monthly chart drawing tools">
             <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
             <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
             <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+            <button type="button" data-draw-mode="fibonacci" aria-pressed="false">Fib retracement</button>
             <button type="button" data-drawing-action="delete" disabled>Delete</button>
             <button type="button" data-drawing-action="clear">Clear</button>
             <button type="button" data-fullscreen-toggle aria-label="Pop out monthly chart">Pop out</button>
@@ -387,10 +460,29 @@
           <h2 id="daily-heading">Daily chart</h2>
           <small>EMA 20 / EMA 50 / SMA 200</small>
         </div>
+        <div class="fullscreen-controls" data-fullscreen-controls="daily" aria-label="Load a ticker on the daily chart">
+          <div>
+            <label>Ticker</label>
+            <input type="text" data-fullscreen-field="symbol" maxlength="20" autocomplete="off" required>
+          </div>
+          <div>
+            <label>History</label>
+            <select data-fullscreen-field="range">
+              <option value="6mo">6 months</option>
+              <option value="1y">1 year</option>
+              <option value="2y">2 years</option>
+              <option value="5y">5 years</option>
+              <option value="10y">10 years</option>
+              <option value="max">Max</option>
+            </select>
+          </div>
+          <button type="button" data-fullscreen-load>Load chart</button>
+        </div>
         <div class="drawing-tools" data-drawing-tools="daily" aria-label="Daily chart drawing tools">
           <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
           <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
           <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+          <button type="button" data-draw-mode="fibonacci" aria-pressed="false">Fib retracement</button>
           <button type="button" data-drawing-action="delete" disabled>Delete</button>
           <button type="button" data-drawing-action="clear">Clear</button>
           <button type="button" data-fullscreen-toggle aria-label="Pop out daily chart">Pop out</button>
@@ -531,6 +623,7 @@
           },
           rightPriceScale: {
             borderColor: '#cbd5e1',
+            minimumWidth: 72,
             scaleMargins: { top: 0.08, bottom: 0.08 }
           },
           timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true },
@@ -583,6 +676,7 @@
           },
           rightPriceScale: {
             borderColor: '#cbd5e1',
+            minimumWidth: 72,
             scaleMargins: { top: 0.05, bottom: 0.05 }
           },
           timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, visible: false },
@@ -629,6 +723,18 @@
         let syncing = false;
         const priceScale = context.chart.timeScale();
         const rsiScale = context.rsiChart.timeScale();
+
+        context.syncTimeRange = () => {
+          const range = priceScale.getVisibleLogicalRange();
+          if (!range || !context.rsiSeries.data().length) return;
+          syncing = true;
+          try {
+            rsiScale.setVisibleLogicalRange(range);
+          } finally {
+            syncing = false;
+          }
+        };
+
         priceScale.subscribeVisibleLogicalRangeChange((range) => {
           if (!range || syncing || !context.rsiSeries.data().length) return;
           syncing = true;
@@ -735,6 +841,27 @@
         return { first, second, start, end };
       }
 
+      const fibonacciLevels = [
+        { ratio: 0, label: '0%' },
+        { ratio: 0.236, label: '23.6%' },
+        { ratio: 0.382, label: '38.2%' },
+        { ratio: 0.5, label: '50%' },
+        { ratio: 0.618, label: '61.8%' },
+        { ratio: 0.786, label: '78.6%' },
+        { ratio: 1, label: '100%' }
+      ];
+
+      function getFibonacciLevelPrices(annotation) {
+        const firstPrice = annotation.points[0].price;
+        const secondPrice = annotation.points[1].price;
+        const high = Math.max(firstPrice, secondPrice);
+        const low = Math.min(firstPrice, secondPrice);
+        return fibonacciLevels.map((level) => ({
+          ...level,
+          price: high - (high - low) * level.ratio
+        }));
+      }
+
       function getPlotWidth(context) {
         const priceScale = context.chart.priceScale('right');
         const scaleWidth = typeof priceScale.width === 'function' ? priceScale.width() : 80;
@@ -782,6 +909,37 @@
             continue;
           }
 
+          if (annotation.type === 'fibonacci') {
+            const first = getPointCoordinates(context, annotation.points[0]);
+            const second = getPointCoordinates(context, annotation.points[1]);
+            if (!first || !second) continue;
+            const x1 = Math.min(first.x, second.x);
+            const x2 = getPlotWidth(context);
+            for (const level of getFibonacciLevelPrices(annotation)) {
+              const y = context.candleSeries.priceToCoordinate(level.price);
+              if (!Number.isFinite(y)) continue;
+              overlay.append(createSvgElement('line', {
+                x1, y1: y, x2, y2: y,
+                class: `fibonacci-line${isSelected ? ' selected' : ''}`,
+                'data-annotation-id': annotation.id
+              }));
+              const label = createSvgElement('text', {
+                x: x2 - 6, y: y - 4, 'text-anchor': 'end', class: 'fibonacci-label'
+              });
+              label.textContent = `${level.label}  ${level.price.toFixed(2)}`;
+              overlay.append(label);
+            }
+            if (isSelected) {
+              for (const [index, point] of [first, second].entries()) {
+                overlay.append(createSvgElement('circle', {
+                  cx: point.x, cy: point.y, r: 6, class: 'drawing-handle',
+                  'data-annotation-id': annotation.id, 'data-endpoint': index
+                }));
+              }
+            }
+            continue;
+          }
+
           const coordinates = getTrendlineCoordinates(context, annotation);
           if (!coordinates) continue;
           overlay.append(createSvgElement('line', {
@@ -807,6 +965,14 @@
               cx: draftPoint.x, cy: draftPoint.y, r: 5, class: 'drawing-handle'
             }));
           }
+        } else if (context.draft?.type === 'fibonacci') {
+          const draftPrice = context.candleSeries.priceToCoordinate(context.draft.points[0].price);
+          if (Number.isFinite(draftPrice)) {
+            overlay.append(createSvgElement('line', {
+              x1: 0, y1: draftPrice, x2: plotWidth, y2: draftPrice,
+              class: 'fibonacci-line'
+            }));
+          }
         }
       }
 
@@ -819,6 +985,17 @@
           if (annotation.type === 'horizontal') {
             const y = context.candleSeries.priceToCoordinate(annotation.price);
             if (Number.isFinite(y)) distance = Math.abs(point.y - y);
+          } else if (annotation.type === 'fibonacci') {
+            const coordinates = annotation.points.map((anchor) => getPointCoordinates(context, anchor));
+            if (coordinates.every(Boolean)) {
+              const xStart = Math.min(coordinates[0].x, coordinates[1].x);
+              if (point.x >= xStart && point.x <= getPlotWidth(context)) {
+                for (const level of getFibonacciLevelPrices(annotation)) {
+                  const y = context.candleSeries.priceToCoordinate(level.price);
+                  if (Number.isFinite(y)) distance = Math.min(distance, Math.abs(point.y - y));
+                }
+              }
+            }
           } else {
             const coordinates = getTrendlineCoordinates(context, annotation);
             if (coordinates) {
@@ -872,12 +1049,46 @@
             `${isFullscreen ? 'Exit fullscreen' : 'Pop out'} ${context.timeframe} chart`
           );
         }
+        syncFullscreenControls();
         requestAnimationFrame(() => {
           for (const context of chartContexts.values()) {
             renderDrawingOverlay(context);
           }
         });
       }
+
+      function syncFullscreenControls() {
+        for (const controls of document.querySelectorAll('[data-fullscreen-controls]')) {
+          controls.querySelector('[data-fullscreen-field="symbol"]').value = $('#symbol').value;
+          controls.querySelector('[data-fullscreen-field="range"]').value = $('#range').value;
+        }
+      }
+
+      document.querySelectorAll('[data-fullscreen-controls]').forEach((controls) => {
+        controls.querySelectorAll('[data-fullscreen-field]').forEach((field) => {
+          field.addEventListener('input', () => {
+            const primary = document.getElementById(field.dataset.fullscreenField);
+            primary.value = field.value;
+            syncFullscreenControls();
+          });
+          field.addEventListener('change', () => {
+            const primary = document.getElementById(field.dataset.fullscreenField);
+            primary.value = field.value;
+            syncFullscreenControls();
+          });
+        });
+        controls.querySelector('[data-fullscreen-load]').addEventListener('click', () => {
+          const symbol = controls.querySelector('[data-fullscreen-field="symbol"]');
+          if (!symbol.reportValidity()) return;
+          $('#symbol').value = symbol.value;
+          $('#range').value = controls.querySelector('[data-fullscreen-field="range"]').value;
+          $('#form').requestSubmit();
+        });
+      });
+
+      $('#symbol').addEventListener('input', syncFullscreenControls);
+      $('#range').addEventListener('change', syncFullscreenControls);
+      syncFullscreenControls();
 
       function attachDrawingInteractions(context) {
         const toolbar = document.querySelector(`[data-drawing-tools="${context.timeframe}"]`);
@@ -923,9 +1134,21 @@
             annotations.push(annotation);
             context.selectedId = annotation.id;
             context.mode = 'select';
-          } else if (!context.draft) {
+          } else if (context.mode === 'fibonacci' && !context.draft) {
+            context.draft = { type: 'fibonacci', points: [anchor] };
+          } else if (context.mode === 'fibonacci') {
+            const annotation = {
+              id: createAnnotationId(),
+              type: 'fibonacci',
+              points: [context.draft.points[0], anchor]
+            };
+            annotations.push(annotation);
+            context.selectedId = annotation.id;
+            context.draft = null;
+            context.mode = 'select';
+          } else if (context.mode === 'trendline' && !context.draft) {
             context.draft = { type: 'trendline', points: [anchor] };
-          } else {
+          } else if (context.mode === 'trendline') {
             const annotation = {
               id: createAnnotationId(),
               type: 'trendline',
@@ -1648,9 +1871,15 @@
           weekly.priceByTime = new Map(weeklyRows.map((row) => [chartTimeKey(row.time), row.close]));
           monthly.priceByTime = new Map(monthlyRows.map((row) => [chartTimeKey(row.time), row.close]));
           daily.priceByTime = new Map(dailyRows.map((row) => [chartTimeKey(row.time), row.close]));
-          buildLineSeries(weekly.rsiSeries, weeklyRsiPoints);
-          buildLineSeries(monthly.rsiSeries, monthlyRsiPoints);
-          buildLineSeries(daily.rsiSeries, dailyRsiPoints);
+          weekly.rsiSeries.setData(weeklyRsiPoints.map((point) => (
+            Number.isFinite(point.value) ? point : { time: point.time }
+          )));
+          monthly.rsiSeries.setData(monthlyRsiPoints.map((point) => (
+            Number.isFinite(point.value) ? point : { time: point.time }
+          )));
+          daily.rsiSeries.setData(dailyRsiPoints.map((point) => (
+            Number.isFinite(point.value) ? point : { time: point.time }
+          )));
 
           buildLineSeries(weekly.ema20, buildMoveSeries(weeklyCloses, allWeeklyRows, 20)
             .filter((point) => !weeklyStart || point.time >= weeklyStart));
@@ -1712,6 +1941,7 @@
           weekly.chart.timeScale().fitContent();
           monthly.chart.timeScale().fitContent();
           daily.chart.timeScale().fitContent();
+          for (const context of chartContexts.values()) context.syncTimeRange();
           for (const view of Object.values(metricViews)) {
             view.histogram.chart.timeScale().fitContent();
           }
