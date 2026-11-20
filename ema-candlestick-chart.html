@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Daily, Weekly &amp; Monthly Moving Averages</title>
+  <title>Charts</title>
   <script src="https://unpkg.com/lightweight-charts@5.0.8/dist/lightweight-charts.standalone.production.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
@@ -148,6 +148,33 @@
       border-radius: 14px;
       overflow: hidden;
     }
+    .chart-panel:fullscreen {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      background: #f1f2f4;
+      border: 0;
+      border-radius: 0;
+    }
+    .chart-panel:fullscreen .panel-header { flex: 0 0 auto; }
+    .chart-panel:fullscreen .chart-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      padding: 12px 20px 20px;
+    }
+    .chart-panel:fullscreen .chart-stack {
+      height: 100%;
+      min-height: 0;
+      grid-template-rows: minmax(0, 1fr) auto minmax(130px, 22vh);
+    }
+    .chart-panel:fullscreen .chart-box,
+    .chart-panel:fullscreen .daily-chart-box {
+      height: 100%;
+      min-height: 0;
+    }
+    .chart-panel:fullscreen .rsi-chart-box { height: 100%; }
     .panel-header {
       display: flex;
       justify-content: space-between;
@@ -200,9 +227,10 @@
       letter-spacing: 0.04em;
     }
     .chart-wrap { padding: 12px; }
+    .chart-stack { display: grid; gap: 4px; }
     .chart-box {
       width: 100%;
-      height: 560px;
+      height: 460px;
       min-height: 360px;
       border-radius: 10px;
       overflow: hidden;
@@ -233,16 +261,33 @@
       cursor: move;
     }
     .drawing-overlay[data-active="true"] { cursor: crosshair; }
+    .rsi-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 4px 2px 0;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .rsi-heading small { color: var(--muted); font-weight: 500; }
+    .rsi-chart-box {
+      width: 100%;
+      height: 160px;
+      min-height: 130px;
+      overflow: hidden;
+      border-radius: 8px;
+    }
     @media (max-width: 700px) {
       .panel-header { align-items: flex-start; flex-direction: column; }
       .drawing-tools { justify-content: flex-start; }
     }
-    .daily-chart-box { height: 640px; }
+    .daily-chart-box { height: 500px; }
     @media (max-width: 900px) {
       .chart-grid { grid-template-columns: 1fr; }
       .histogram-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .chart-box { height: 420px; }
-      .daily-chart-box { height: 420px; }
+      .chart-box { height: 380px; }
+      .daily-chart-box { height: 400px; }
     }
     @media (max-width: 600px) {
       .histogram-grid { grid-template-columns: 1fr; }
@@ -287,7 +332,7 @@
     <div id="status" class="status" role="status" aria-live="polite" aria-atomic="true">Loading Yahoo Finance prices…</div>
 
     <section class="chart-grid">
-      <section class="panel" aria-labelledby="weekly-heading">
+      <section class="panel chart-panel" data-chart-panel="weekly" aria-labelledby="weekly-heading">
         <div class="panel-header">
           <div>
             <h2 id="weekly-heading">Weekly chart</h2>
@@ -299,12 +344,19 @@
             <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
             <button type="button" data-drawing-action="delete" disabled>Delete</button>
             <button type="button" data-drawing-action="clear">Clear</button>
+            <button type="button" data-fullscreen-toggle aria-label="Pop out weekly chart">Pop out</button>
           </div>
         </div>
-        <div class="chart-wrap"><div id="weeklyChart" class="chart-box" role="img" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+        <div class="chart-wrap">
+          <div class="chart-stack">
+            <div id="weeklyChart" class="chart-box" role="img" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
+            <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
+            <div id="weeklyRsiChart" class="rsi-chart-box" role="img" aria-label="Weekly 14-period relative strength index with 70 and 30 reference levels"></div>
+          </div>
+        </div>
       </section>
 
-      <section class="panel" aria-labelledby="monthly-heading">
+      <section class="panel chart-panel" data-chart-panel="monthly" aria-labelledby="monthly-heading">
         <div class="panel-header">
           <div>
             <h2 id="monthly-heading">Monthly chart</h2>
@@ -316,13 +368,20 @@
             <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
             <button type="button" data-drawing-action="delete" disabled>Delete</button>
             <button type="button" data-drawing-action="clear">Clear</button>
+            <button type="button" data-fullscreen-toggle aria-label="Pop out monthly chart">Pop out</button>
           </div>
         </div>
-        <div class="chart-wrap"><div id="monthlyChart" class="chart-box" role="img" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+        <div class="chart-wrap">
+          <div class="chart-stack">
+            <div id="monthlyChart" class="chart-box" role="img" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
+            <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
+            <div id="monthlyRsiChart" class="rsi-chart-box" role="img" aria-label="Monthly 14-period relative strength index with 70 and 30 reference levels"></div>
+          </div>
+        </div>
       </section>
     </section>
 
-    <section class="daily-panel" aria-labelledby="daily-heading">
+    <section class="daily-panel chart-panel" data-chart-panel="daily" aria-labelledby="daily-heading">
       <div class="panel-header">
         <div>
           <h2 id="daily-heading">Daily chart</h2>
@@ -334,9 +393,16 @@
           <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
           <button type="button" data-drawing-action="delete" disabled>Delete</button>
           <button type="button" data-drawing-action="clear">Clear</button>
+          <button type="button" data-fullscreen-toggle aria-label="Pop out daily chart">Pop out</button>
         </div>
       </div>
-      <div class="chart-wrap"><div id="dailyChart" class="chart-box daily-chart-box" role="img" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div></div>
+      <div class="chart-wrap">
+        <div class="chart-stack">
+          <div id="dailyChart" class="chart-box daily-chart-box" role="img" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
+          <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
+          <div id="dailyRsiChart" class="rsi-chart-box" role="img" aria-label="Daily 14-period relative strength index with 70 and 30 reference levels"></div>
+        </div>
+      </div>
     </section>
 
     <section class="histogram-section" aria-labelledby="weekly-metrics-heading">
@@ -437,6 +503,9 @@
       const weeklyChartEl = $('#weeklyChart');
       const monthlyChartEl = $('#monthlyChart');
       const dailyChartEl = $('#dailyChart');
+      const weeklyRsiChartEl = $('#weeklyRsiChart');
+      const monthlyRsiChartEl = $('#monthlyRsiChart');
+      const dailyRsiChartEl = $('#dailyRsiChart');
       const annotationStore = new Map();
       const chartContexts = new Map();
       const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -448,7 +517,7 @@
         return;
       }
 
-      function makeChart(el, timeframe) {
+      function makeChart(el, timeframe, rsiEl) {
         const chart = LightweightCharts.createChart(el, {
           autoSize: true,
           layout: {
@@ -486,6 +555,7 @@
         const sma200 = chart.addSeries(LightweightCharts.LineSeries, {
           color: '#7654d6', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
         });
+        const rsi = makeRsiChart(rsiEl);
 
         const overlay = document.createElementNS(svgNamespace, 'svg');
         overlay.classList.add('drawing-overlay');
@@ -493,17 +563,126 @@
         el.append(overlay);
 
         return {
-          chart, candleSeries, ema20, ema50, sma200, el, overlay, timeframe,
+          chart, candleSeries, ema20, ema50, sma200, rsiChart: rsi.chart,
+          rsiSeries: rsi.series, el, overlay, timeframe,
           mode: 'select', selectedId: null, draft: null, drag: null
         };
       }
 
-      const weekly = makeChart(weeklyChartEl, 'weekly');
-      const monthly = makeChart(monthlyChartEl, 'monthly');
-      const daily = makeChart(dailyChartEl, 'daily');
+      function makeRsiChart(el) {
+        const chart = LightweightCharts.createChart(el, {
+          autoSize: true,
+          layout: {
+            background: { type: 'solid', color: '#ffffff' },
+            textColor: '#475569',
+            fontFamily: 'system-ui, sans-serif'
+          },
+          grid: {
+            vertLines: { color: '#edf0f3' },
+            horzLines: { color: '#e2e8f0' }
+          },
+          rightPriceScale: {
+            borderColor: '#cbd5e1',
+            scaleMargins: { top: 0.05, bottom: 0.05 }
+          },
+          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, visible: false },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+        const series = chart.addSeries(LightweightCharts.LineSeries, {
+          color: '#3478c8',
+          lineWidth: 2,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          priceFormat: { type: 'price', precision: 1, minMove: 0.1 },
+          autoscaleInfoProvider: () => ({
+            priceRange: { minValue: 0, maxValue: 100 }
+          })
+        });
+        series.createPriceLine({
+          price: 70, color: '#d94b58', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: false, title: '70'
+        });
+        series.createPriceLine({
+          price: 30, color: '#138a63', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: false, title: '30'
+        });
+        return { chart, series };
+      }
+
+      const weekly = makeChart(weeklyChartEl, 'weekly', weeklyRsiChartEl);
+      const monthly = makeChart(monthlyChartEl, 'monthly', monthlyRsiChartEl);
+      const daily = makeChart(dailyChartEl, 'daily', dailyRsiChartEl);
       for (const context of [weekly, monthly, daily]) {
         chartContexts.set(context.timeframe, context);
       }
+
+      function chartTimeKey(time) {
+        if (time && typeof time === 'object' && 'year' in time) {
+          const month = String(time.month).padStart(2, '0');
+          const day = String(time.day).padStart(2, '0');
+          return `${time.year}-${month}-${day}`;
+        }
+        return String(time);
+      }
+
+      function linkPriceAndRsiTimeScales(context) {
+        let syncing = false;
+        const priceScale = context.chart.timeScale();
+        const rsiScale = context.rsiChart.timeScale();
+        priceScale.subscribeVisibleLogicalRangeChange((range) => {
+          if (!range || syncing || !context.rsiSeries.data().length) return;
+          syncing = true;
+          try {
+            rsiScale.setVisibleLogicalRange(range);
+          } finally {
+            syncing = false;
+          }
+        });
+        rsiScale.subscribeVisibleLogicalRangeChange((range) => {
+          if (!range || syncing || !context.candleSeries.data().length) return;
+          syncing = true;
+          try {
+            priceScale.setVisibleLogicalRange(range);
+          } finally {
+            syncing = false;
+          }
+        });
+
+        context.chart.subscribeCrosshairMove((param) => {
+          if (syncing) return;
+          syncing = true;
+          try {
+            const value = param.time
+              ? context.rsiByTime?.get(chartTimeKey(param.time))
+              : null;
+            if (param.time && Number.isFinite(value)) {
+              context.rsiChart.setCrosshairPosition(value, param.time, context.rsiSeries);
+            } else {
+              context.rsiChart.clearCrosshairPosition();
+            }
+          } finally {
+            syncing = false;
+          }
+        });
+        context.rsiChart.subscribeCrosshairMove((param) => {
+          if (syncing) return;
+          syncing = true;
+          try {
+            const value = param.time
+              ? context.priceByTime?.get(chartTimeKey(param.time))
+              : null;
+            if (param.time && Number.isFinite(value)) {
+              context.chart.setCrosshairPosition(value, param.time, context.candleSeries);
+            } else {
+              context.chart.clearCrosshairPosition();
+            }
+          } finally {
+            syncing = false;
+          }
+        });
+      }
+
+      for (const context of chartContexts.values()) linkPriceAndRsiTimeScales(context);
 
       function getAnnotations(context) {
         const key = `${activeSymbol}:${context.timeframe}`;
@@ -663,11 +842,53 @@
         renderDrawingOverlay(context);
       }
 
+      async function toggleChartFullscreen(context) {
+        const panel = context.el.closest('[data-chart-panel]');
+        if (!panel) return;
+        try {
+          if (document.fullscreenElement === panel) {
+            await document.exitFullscreen();
+          } else {
+            if (document.fullscreenElement) await document.exitFullscreen();
+            await panel.requestFullscreen();
+          }
+        } catch (error) {
+          $('#status').textContent = `Could not open chart fullscreen: ${error.message || error}`;
+          $('#status').classList.add('error');
+        }
+      }
+
+      function updateFullscreenButtons() {
+        for (const context of chartContexts.values()) {
+          const panel = context.el.closest('[data-chart-panel]');
+          const button = document.querySelector(
+            `[data-drawing-tools="${context.timeframe}"] [data-fullscreen-toggle]`
+          );
+          if (!panel || !button) continue;
+          const isFullscreen = document.fullscreenElement === panel;
+          button.textContent = isFullscreen ? 'Exit' : 'Pop out';
+          button.setAttribute(
+            'aria-label',
+            `${isFullscreen ? 'Exit fullscreen' : 'Pop out'} ${context.timeframe} chart`
+          );
+        }
+        requestAnimationFrame(() => {
+          for (const context of chartContexts.values()) {
+            renderDrawingOverlay(context);
+          }
+        });
+      }
+
       function attachDrawingInteractions(context) {
         const toolbar = document.querySelector(`[data-drawing-tools="${context.timeframe}"]`);
         toolbar?.addEventListener('click', (event) => {
           const button = event.target.closest('button');
           if (!button) return;
+
+          if (button.hasAttribute('data-fullscreen-toggle')) {
+            toggleChartFullscreen(context);
+            return;
+          }
 
           if (button.dataset.drawMode) {
             context.mode = button.dataset.drawMode;
@@ -763,6 +984,7 @@
       }
 
       for (const context of chartContexts.values()) attachDrawingInteractions(context);
+      document.addEventListener('fullscreenchange', updateFullscreenButtons);
 
       window.addEventListener('keydown', (event) => {
         if (event.key !== 'Escape') return;
@@ -1033,6 +1255,39 @@
         return averages;
       }
 
+      function rsi(values, period = 14) {
+        const valuesByIndex = Array(values.length).fill(null);
+        if (!Number.isInteger(period) || period <= 0 || values.length <= period) {
+          return valuesByIndex;
+        }
+
+        let averageGain = 0;
+        let averageLoss = 0;
+        for (let i = 1; i <= period; i++) {
+          const change = values[i] - values[i - 1];
+          averageGain += Math.max(change, 0);
+          averageLoss += Math.max(-change, 0);
+        }
+        averageGain /= period;
+        averageLoss /= period;
+
+        const toRsi = () => {
+          if (averageLoss === 0) return averageGain === 0 ? 50 : 100;
+          if (averageGain === 0) return 0;
+          const relativeStrength = averageGain / averageLoss;
+          return 100 - (100 / (1 + relativeStrength));
+        };
+
+        valuesByIndex[period] = toRsi();
+        for (let i = period + 1; i < values.length; i++) {
+          const change = values[i] - values[i - 1];
+          averageGain = ((averageGain * (period - 1)) + Math.max(change, 0)) / period;
+          averageLoss = ((averageLoss * (period - 1)) + Math.max(-change, 0)) / period;
+          valuesByIndex[i] = toRsi();
+        }
+        return valuesByIndex;
+      }
+
       function getWeekStart(dateString) {
         const d = new Date(dateString + 'T00:00:00Z');
         const day = d.getUTCDay() || 7;
@@ -1115,6 +1370,11 @@
           data.ema20.setData([]);
           data.ema50.setData([]);
           data.sma200.setData([]);
+          data.rsiSeries.setData([]);
+          data.priceByTime = new Map();
+          data.rsiByTime = new Map();
+          data.chart.clearCrosshairPosition();
+          data.rsiChart.clearCrosshairPosition();
         }
         for (const view of Object.values(metricViews)) {
           view.points = [];
@@ -1360,6 +1620,37 @@
           const dailySma200 = sma(dailyCloses, 200);
           const weeklySma200 = sma(weeklyCloses, 200);
           const monthlySma200 = sma(monthlyCloses, 200);
+          const dailyRsi = rsi(dailyCloses);
+          const weeklyRsi = rsi(weeklyCloses);
+          const monthlyRsi = rsi(monthlyCloses);
+
+          const weeklyRsiPoints = allWeeklyRows.map((row, i) => ({
+            time: row.time,
+            value: weeklyRsi[i]
+          })).filter((point) => !weeklyStart || point.time >= weeklyStart);
+          const monthlyRsiPoints = allMonthlyRows.map((row, i) => ({
+            time: row.time,
+            value: monthlyRsi[i]
+          })).filter((point) => !monthlyStart || point.time >= monthlyStart);
+          const dailyRsiPoints = allDailyRows.map((row, i) => ({
+            time: row.time,
+            value: dailyRsi[i]
+          })).filter((point) => !visibleStart || point.time >= visibleStart);
+          weekly.rsiByTime = new Map(weeklyRsiPoints
+            .filter((point) => Number.isFinite(point.value))
+            .map((point) => [chartTimeKey(point.time), point.value]));
+          monthly.rsiByTime = new Map(monthlyRsiPoints
+            .filter((point) => Number.isFinite(point.value))
+            .map((point) => [chartTimeKey(point.time), point.value]));
+          daily.rsiByTime = new Map(dailyRsiPoints
+            .filter((point) => Number.isFinite(point.value))
+            .map((point) => [chartTimeKey(point.time), point.value]));
+          weekly.priceByTime = new Map(weeklyRows.map((row) => [chartTimeKey(row.time), row.close]));
+          monthly.priceByTime = new Map(monthlyRows.map((row) => [chartTimeKey(row.time), row.close]));
+          daily.priceByTime = new Map(dailyRows.map((row) => [chartTimeKey(row.time), row.close]));
+          buildLineSeries(weekly.rsiSeries, weeklyRsiPoints);
+          buildLineSeries(monthly.rsiSeries, monthlyRsiPoints);
+          buildLineSeries(daily.rsiSeries, dailyRsiPoints);
 
           buildLineSeries(weekly.ema20, buildMoveSeries(weeklyCloses, allWeeklyRows, 20)
             .filter((point) => !weeklyStart || point.time >= weeklyStart));
