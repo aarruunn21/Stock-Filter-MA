@@ -33,12 +33,11 @@
       padding: 28px;
     }
     .topbar {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       gap: 20px;
       align-items: center;
       margin-bottom: 20px;
-      flex-wrap: wrap;
     }
     h1 {
       margin: 6px 0 0;
@@ -46,8 +45,24 @@
       letter-spacing: -0.04em;
     }
     .sub { color: var(--muted); }
+    .quote-summary {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 12px;
+      min-width: 0;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .quote-symbol { color: #000; font-size: 1.35rem; font-weight: 850; }
+    .quote-price { color: #26313f; font-size: 1.2rem; font-weight: 700; }
+    .quote-change { font-size: 1rem; font-weight: 750; }
+    .quote-change.positive { color: #138a63; }
+    .quote-change.negative { color: #c43d4b; }
+    .quote-change.neutral { color: var(--muted); }
     .controls {
       display: flex;
+      justify-self: end;
       gap: 10px;
       align-items: end;
       flex-wrap: wrap;
@@ -277,7 +292,10 @@
       stroke-dasharray: 4 3;
       vector-effect: non-scaling-stroke;
     }
-    .fibonacci-line.selected { stroke: #1769c2; stroke-width: 2.5; }
+    .fibonacci-line-outer { stroke: #0f766e; }
+    .fibonacci-line-inner { stroke: #d97706; }
+    .fibonacci-line-midpoint { stroke: #7c3aed; stroke-width: 3; }
+    .fibonacci-line.selected { stroke-width: 3.5; }
     .fibonacci-label {
       fill: #475569;
       font: 11px system-ui, sans-serif;
@@ -287,6 +305,9 @@
       stroke-linejoin: round;
       pointer-events: none;
     }
+    .fibonacci-label-outer { fill: #0f766e; }
+    .fibonacci-label-inner { fill: #d97706; }
+    .fibonacci-label-midpoint { fill: #7c3aed; font-weight: 700; }
     .drawing-handle {
       fill: #fff;
       stroke: #1769c2;
@@ -317,6 +338,15 @@
       .panel-header { align-items: flex-start; flex-direction: column; }
       .drawing-tools { justify-content: flex-start; }
     }
+    @media (max-width: 900px) {
+      .topbar { grid-template-columns: minmax(0, 1fr) auto; }
+      .controls { grid-column: 1 / -1; justify-self: start; }
+    }
+    @media (max-width: 600px) {
+      .topbar { grid-template-columns: 1fr; gap: 14px; }
+      .quote-summary { justify-content: flex-start; }
+      .controls { grid-column: auto; }
+    }
     .daily-chart-box { height: 500px; }
     @media (max-width: 900px) {
       .chart-grid { grid-template-columns: 1fr; }
@@ -336,6 +366,12 @@
       <div>
         <div class="sub">MARKET STRUCTURE · TREND FILTER</div>
         <h1>Charts</h1>
+      </div>
+
+      <div id="quote-summary" class="quote-summary" aria-live="polite" hidden>
+        <strong id="quote-symbol" class="quote-symbol"></strong>
+        <span id="quote-price" class="quote-price"></span>
+        <span id="quote-change" class="quote-change"></span>
       </div>
 
       <form id="form" class="controls">
@@ -843,11 +879,11 @@
 
       const fibonacciLevels = [
         { ratio: 0, label: '0%' },
-        { ratio: 0.236, label: '23.6%' },
-        { ratio: 0.382, label: '38.2%' },
-        { ratio: 0.5, label: '50%' },
-        { ratio: 0.618, label: '61.8%' },
-        { ratio: 0.786, label: '78.6%' },
+        { ratio: 0.236, label: '23.6%', colorClass: 'outer' },
+        { ratio: 0.382, label: '38.2%', colorClass: 'inner' },
+        { ratio: 0.5, label: '50%', colorClass: 'midpoint' },
+        { ratio: 0.618, label: '61.8%', colorClass: 'inner' },
+        { ratio: 0.786, label: '78.6%', colorClass: 'outer' },
         { ratio: 1, label: '100%' }
       ];
 
@@ -920,11 +956,12 @@
               if (!Number.isFinite(y)) continue;
               overlay.append(createSvgElement('line', {
                 x1, y1: y, x2, y2: y,
-                class: `fibonacci-line${isSelected ? ' selected' : ''}`,
+                class: `fibonacci-line${level.colorClass ? ` fibonacci-line-${level.colorClass}` : ''}${isSelected ? ' selected' : ''}`,
                 'data-annotation-id': annotation.id
               }));
               const label = createSvgElement('text', {
-                x: x2 - 6, y: y - 4, 'text-anchor': 'end', class: 'fibonacci-label'
+                x: x2 - 6, y: y - 4, 'text-anchor': 'end',
+                class: `fibonacci-label${level.colorClass ? ` fibonacci-label-${level.colorClass}` : ''}`
               });
               label.textContent = `${level.label}  ${level.price.toFixed(2)}`;
               overlay.append(label);
@@ -1669,6 +1706,11 @@
         const controller = new AbortController();
         activeRequest = controller;
         clearChartData();
+        $('#quote-summary').hidden = false;
+        $('#quote-symbol').textContent = symbol;
+        $('#quote-price').textContent = 'Loading…';
+        $('#quote-change').textContent = '';
+        $('#quote-change').className = 'quote-change';
         $('#status').classList.remove('error');
         $('#status').textContent = `Fetching full history for ${symbol}…`;
         $('#load').disabled = true;
@@ -1919,6 +1961,13 @@
           const currency = /^[A-Z]{3}$/.test(result.meta?.currency || '')
             ? result.meta.currency
             : 'USD';
+          $('#quote-symbol').textContent = symbol;
+          $('#quote-price').textContent = formatOutput(last.close, currency);
+          const quoteChange = $('#quote-change');
+          quoteChange.textContent = changePct === null
+            ? ''
+            : `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+          quoteChange.className = `quote-change ${changePct > 0 ? 'positive' : changePct < 0 ? 'negative' : 'neutral'}`;
           const warmingUp = [
             ['daily', allDailyRows.length],
             ['weekly', allWeeklyRows.length],
@@ -1948,6 +1997,8 @@
           for (const context of chartContexts.values()) renderDrawingOverlay(context);
         } catch (error) {
           if (error?.name !== 'AbortError') {
+            $('#quote-price').textContent = 'Unavailable';
+            $('#quote-change').textContent = '';
             $('#status').textContent = error instanceof Error ? error.message : 'Unable to load chart data.';
             $('#status').classList.add('error');
           }
