@@ -201,7 +201,7 @@
     .chart-panel:fullscreen .chart-stack {
       height: 100%;
       min-height: 0;
-      grid-template-rows: minmax(0, 1fr) auto minmax(130px, 22vh);
+      grid-template-rows: minmax(0, 1fr) auto minmax(100px, 15vh) auto minmax(80px, 12vh);
     }
     .chart-panel:fullscreen .chart-box,
     .chart-panel:fullscreen .daily-chart-box {
@@ -209,6 +209,7 @@
       min-height: 0;
     }
     .chart-panel:fullscreen .rsi-chart-box { height: 100%; }
+    .chart-panel:fullscreen .volume-chart-box { height: 100%; }
     .panel-header {
       display: flex;
       justify-content: space-between;
@@ -334,6 +335,23 @@
       overflow: hidden;
       border-radius: 8px;
     }
+    .volume-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 4px 2px 0;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .volume-heading small { color: var(--muted); font-weight: 500; }
+    .volume-chart-box {
+      width: 100%;
+      height: 110px;
+      min-height: 90px;
+      overflow: hidden;
+      border-radius: 8px;
+    }
     @media (max-width: 700px) {
       .panel-header { align-items: flex-start; flex-direction: column; }
       .drawing-tools { justify-content: flex-start; }
@@ -442,6 +460,8 @@
             <div id="weeklyChart" class="chart-box" role="img" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
             <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
             <div id="weeklyRsiChart" class="rsi-chart-box" role="img" aria-label="Weekly 14-period relative strength index with 70 and 30 reference levels"></div>
+            <div class="volume-heading">Volume</div>
+            <div id="weeklyVolumeChart" class="volume-chart-box" role="img" aria-label="Weekly trading volume bars"></div>
           </div>
         </div>
       </section>
@@ -485,6 +505,8 @@
             <div id="monthlyChart" class="chart-box" role="img" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
             <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
             <div id="monthlyRsiChart" class="rsi-chart-box" role="img" aria-label="Monthly 14-period relative strength index with 70 and 30 reference levels"></div>
+            <div class="volume-heading">Volume</div>
+            <div id="monthlyVolumeChart" class="volume-chart-box" role="img" aria-label="Monthly trading volume bars"></div>
           </div>
         </div>
       </section>
@@ -529,6 +551,8 @@
           <div id="dailyChart" class="chart-box daily-chart-box" role="img" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
           <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
           <div id="dailyRsiChart" class="rsi-chart-box" role="img" aria-label="Daily 14-period relative strength index with 70 and 30 reference levels"></div>
+          <div class="volume-heading">Volume</div>
+          <div id="dailyVolumeChart" class="volume-chart-box" role="img" aria-label="Daily trading volume bars"></div>
         </div>
       </div>
     </section>
@@ -634,6 +658,9 @@
       const weeklyRsiChartEl = $('#weeklyRsiChart');
       const monthlyRsiChartEl = $('#monthlyRsiChart');
       const dailyRsiChartEl = $('#dailyRsiChart');
+      const weeklyVolumeChartEl = $('#weeklyVolumeChart');
+      const monthlyVolumeChartEl = $('#monthlyVolumeChart');
+      const dailyVolumeChartEl = $('#dailyVolumeChart');
       const annotationStore = new Map();
       const chartContexts = new Map();
       const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -645,7 +672,7 @@
         return;
       }
 
-      function makeChart(el, timeframe, rsiEl) {
+      function makeChart(el, timeframe, rsiEl, volumeEl) {
         const chart = LightweightCharts.createChart(el, {
           autoSize: true,
           layout: {
@@ -662,7 +689,7 @@
             minimumWidth: 72,
             scaleMargins: { top: 0.08, bottom: 0.08 }
           },
-          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true },
+          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, fixRightEdge: false, rightOffset: 8 },
           crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
         });
 
@@ -685,6 +712,7 @@
           color: '#7654d6', lineWidth: 2, priceLineVisible: false, lastValueVisible: true
         });
         const rsi = makeRsiChart(rsiEl);
+        const volume = makeVolumeChart(volumeEl);
 
         const overlay = document.createElementNS(svgNamespace, 'svg');
         overlay.classList.add('drawing-overlay');
@@ -693,7 +721,8 @@
 
         return {
           chart, candleSeries, ema20, ema50, sma200, rsiChart: rsi.chart,
-          rsiSeries: rsi.series, el, overlay, timeframe,
+          rsiSeries: rsi.series, volumeChart: volume.chart, volumeSeries: volume.series,
+          el, overlay, timeframe,
           mode: 'select', selectedId: null, draft: null, drag: null
         };
       }
@@ -715,7 +744,7 @@
             minimumWidth: 72,
             scaleMargins: { top: 0.05, bottom: 0.05 }
           },
-          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, visible: false },
+          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, fixRightEdge: false, rightOffset: 8, visible: false },
           crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
         });
         const series = chart.addSeries(LightweightCharts.LineSeries, {
@@ -739,9 +768,37 @@
         return { chart, series };
       }
 
-      const weekly = makeChart(weeklyChartEl, 'weekly', weeklyRsiChartEl);
-      const monthly = makeChart(monthlyChartEl, 'monthly', monthlyRsiChartEl);
-      const daily = makeChart(dailyChartEl, 'daily', dailyRsiChartEl);
+      function makeVolumeChart(el) {
+        const chart = LightweightCharts.createChart(el, {
+          autoSize: true,
+          layout: {
+            background: { type: 'solid', color: '#ffffff' },
+            textColor: '#475569',
+            fontFamily: 'system-ui, sans-serif'
+          },
+          grid: {
+            vertLines: { color: '#edf0f3' },
+            horzLines: { color: '#e2e8f0' }
+          },
+          rightPriceScale: {
+            borderColor: '#cbd5e1',
+            minimumWidth: 72,
+            scaleMargins: { top: 0.1, bottom: 0.05 }
+          },
+          timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, fixRightEdge: false, rightOffset: 8, visible: false },
+          crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+        const series = chart.addSeries(LightweightCharts.HistogramSeries, {
+          priceFormat: { type: 'volume' },
+          priceLineVisible: false,
+          lastValueVisible: false
+        });
+        return { chart, series };
+      }
+
+      const weekly = makeChart(weeklyChartEl, 'weekly', weeklyRsiChartEl, weeklyVolumeChartEl);
+      const monthly = makeChart(monthlyChartEl, 'monthly', monthlyRsiChartEl, monthlyVolumeChartEl);
+      const daily = makeChart(dailyChartEl, 'daily', dailyRsiChartEl, dailyVolumeChartEl);
       for (const context of [weekly, monthly, daily]) {
         chartContexts.set(context.timeframe, context);
       }
@@ -755,76 +812,67 @@
         return String(time);
       }
 
-      function linkPriceAndRsiTimeScales(context) {
+      function linkChartTimeScales(context) {
         let syncing = false;
-        const priceScale = context.chart.timeScale();
-        const rsiScale = context.rsiChart.timeScale();
+        const chartPairs = [
+          [context.chart, context.candleSeries],
+          [context.rsiChart, context.rsiSeries],
+          [context.volumeChart, context.volumeSeries]
+        ];
 
         context.syncTimeRange = () => {
-          const range = priceScale.getVisibleLogicalRange();
-          if (!range || !context.rsiSeries.data().length) return;
+          const range = context.chart.timeScale().getVisibleLogicalRange();
+          if (!range || !context.candleSeries.data().length) return;
           syncing = true;
           try {
-            rsiScale.setVisibleLogicalRange(range);
+            for (const [chart] of chartPairs) {
+              if (chart !== context.chart) chart.timeScale().setVisibleLogicalRange(range);
+            }
           } finally {
             syncing = false;
           }
         };
 
-        priceScale.subscribeVisibleLogicalRangeChange((range) => {
-          if (!range || syncing || !context.rsiSeries.data().length) return;
-          syncing = true;
-          try {
-            rsiScale.setVisibleLogicalRange(range);
-          } finally {
-            syncing = false;
-          }
-        });
-        rsiScale.subscribeVisibleLogicalRangeChange((range) => {
-          if (!range || syncing || !context.candleSeries.data().length) return;
-          syncing = true;
-          try {
-            priceScale.setVisibleLogicalRange(range);
-          } finally {
-            syncing = false;
-          }
-        });
+        for (const [sourceChart] of chartPairs) {
+          sourceChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+            if (!range || syncing || !context.candleSeries.data().length) return;
+            syncing = true;
+            try {
+              for (const [chart] of chartPairs) {
+                if (chart !== sourceChart) chart.timeScale().setVisibleLogicalRange(range);
+              }
+            } finally {
+              syncing = false;
+            }
+          });
 
-        context.chart.subscribeCrosshairMove((param) => {
-          if (syncing) return;
-          syncing = true;
-          try {
-            const value = param.time
-              ? context.rsiByTime?.get(chartTimeKey(param.time))
-              : null;
-            if (param.time && Number.isFinite(value)) {
-              context.rsiChart.setCrosshairPosition(value, param.time, context.rsiSeries);
-            } else {
-              context.rsiChart.clearCrosshairPosition();
+          sourceChart.subscribeCrosshairMove((param) => {
+            if (syncing) return;
+            syncing = true;
+            try {
+              const timeKey = param.time ? chartTimeKey(param.time) : null;
+              const targets = [
+                [context.chart, context.candleSeries, context.priceByTime],
+                [context.rsiChart, context.rsiSeries, context.rsiByTime],
+                [context.volumeChart, context.volumeSeries, context.volumeByTime]
+              ];
+              for (const [chart, series, values] of targets) {
+                if (chart === sourceChart) continue;
+                const value = timeKey ? values?.get(timeKey) : null;
+                if (param.time && Number.isFinite(value)) {
+                  chart.setCrosshairPosition(value, param.time, series);
+                } else {
+                  chart.clearCrosshairPosition();
+                }
+              }
+            } finally {
+              syncing = false;
             }
-          } finally {
-            syncing = false;
-          }
-        });
-        context.rsiChart.subscribeCrosshairMove((param) => {
-          if (syncing) return;
-          syncing = true;
-          try {
-            const value = param.time
-              ? context.priceByTime?.get(chartTimeKey(param.time))
-              : null;
-            if (param.time && Number.isFinite(value)) {
-              context.chart.setCrosshairPosition(value, param.time, context.candleSeries);
-            } else {
-              context.chart.clearCrosshairPosition();
-            }
-          } finally {
-            syncing = false;
-          }
-        });
+          });
+        }
       }
 
-      for (const context of chartContexts.values()) linkPriceAndRsiTimeScales(context);
+      for (const context of chartContexts.values()) linkChartTimeScales(context);
 
       function getAnnotations(context) {
         const key = `${activeSymbol}:${context.timeframe}`;
@@ -1584,13 +1632,15 @@
               open: row.open,
               high: row.high,
               low: row.low,
-              close: row.close
+              close: row.close,
+              volume: Number.isFinite(row.volume) ? row.volume : 0
             });
           } else {
             const current = map.get(key);
             current.high = Math.max(current.high, row.high);
             current.low = Math.min(current.low, row.low);
             current.close = row.close;
+            current.volume += Number.isFinite(row.volume) ? row.volume : 0;
           }
         }
 
@@ -1631,8 +1681,10 @@
           data.ema50.setData([]);
           data.sma200.setData([]);
           data.rsiSeries.setData([]);
+          data.volumeSeries.setData([]);
           data.priceByTime = new Map();
           data.rsiByTime = new Map();
+          data.volumeByTime = new Map();
           data.chart.clearCrosshairPosition();
           data.rsiChart.clearCrosshairPosition();
         }
@@ -1778,6 +1830,7 @@
             const high = quote.high[i];
             const low = quote.low[i];
             const close = quote.close[i];
+            const volume = Number.isFinite(quote.volume?.[i]) ? quote.volume[i] : 0;
             if (![timestamp, open, high, low, close].every(Number.isFinite)) continue;
             if (high < low || high < Math.max(open, close) || low > Math.min(open, close)) continue;
 
@@ -1796,12 +1849,14 @@
                 high,
                 low,
                 close,
+                volume,
                 firstTimestamp: timestamp,
                 lastTimestamp: timestamp
               });
             } else {
               current.high = Math.max(current.high, high);
               current.low = Math.min(current.low, low);
+              current.volume += volume;
               if (timestamp < current.firstTimestamp) {
                 current.open = open;
                 current.firstTimestamp = timestamp;
@@ -1825,7 +1880,8 @@
             open: row.open,
             high: row.high,
             low: row.low,
-            close: row.close
+            close: row.close,
+            volume: row.volume
           }));
 
           const allWeeklyRows = aggregateRows(rows, 'weekly');
@@ -1842,6 +1898,17 @@
           weekly.candleSeries.setData(toCandlePoints(weeklyRows));
           monthly.candleSeries.setData(toCandlePoints(monthlyRows));
           daily.candleSeries.setData(toCandlePoints(dailyRows));
+          const toVolumePoints = (volumeRows) => volumeRows.map((row) => ({
+            time: row.time,
+            value: Number.isFinite(row.volume) ? row.volume : 0,
+            color: row.close >= row.open ? '#138a6380' : '#d94b5880'
+          }));
+          const weeklyVolumePoints = toVolumePoints(weeklyRows);
+          const monthlyVolumePoints = toVolumePoints(monthlyRows);
+          const dailyVolumePoints = toVolumePoints(dailyRows);
+          weekly.volumeSeries.setData(weeklyVolumePoints);
+          monthly.volumeSeries.setData(monthlyVolumePoints);
+          daily.volumeSeries.setData(dailyVolumePoints);
 
           const weeklyMetrics = buildWeeklyMetrics(allWeeklyRows);
           setMetricPoints(
@@ -1913,6 +1980,9 @@
           weekly.priceByTime = new Map(weeklyRows.map((row) => [chartTimeKey(row.time), row.close]));
           monthly.priceByTime = new Map(monthlyRows.map((row) => [chartTimeKey(row.time), row.close]));
           daily.priceByTime = new Map(dailyRows.map((row) => [chartTimeKey(row.time), row.close]));
+          weekly.volumeByTime = new Map(weeklyVolumePoints.map((point) => [chartTimeKey(point.time), point.value]));
+          monthly.volumeByTime = new Map(monthlyVolumePoints.map((point) => [chartTimeKey(point.time), point.value]));
+          daily.volumeByTime = new Map(dailyVolumePoints.map((point) => [chartTimeKey(point.time), point.value]));
           weekly.rsiSeries.setData(weeklyRsiPoints.map((point) => (
             Number.isFinite(point.value) ? point : { time: point.time }
           )));
