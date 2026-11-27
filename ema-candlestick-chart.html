@@ -226,7 +226,7 @@
       gap: 6px;
       flex-wrap: wrap;
     }
-    .drawing-tools button {
+    .drawing-tools button, .price-scale-controls button {
       height: 30px;
       padding: 0 9px;
       border: 1px solid var(--border);
@@ -271,6 +271,14 @@
       overflow: hidden;
       position: relative;
     }
+    .price-scale-controls {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      display: flex;
+      gap: 6px;
+      z-index: 3;
+    }
     .drawing-overlay {
       position: absolute;
       inset: 0;
@@ -287,6 +295,8 @@
       vector-effect: non-scaling-stroke;
     }
     .drawing-line.selected { stroke: #1769c2; stroke-width: 3; }
+    .drawing-arrow { stroke: #e05a33; stroke-width: 2.5; fill: #e05a33; vector-effect: non-scaling-stroke; }
+    .drawing-arrow.selected { stroke: #1769c2; fill: #1769c2; stroke-width: 3; }
     .fibonacci-line {
       stroke: #687586;
       stroke-width: 1.5;
@@ -449,15 +459,17 @@
             <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
             <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
             <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+            <button type="button" data-draw-mode="arrow" aria-pressed="false" title="Click the arrow's start, then its tip">Arrow</button>
             <button type="button" data-draw-mode="fibonacci" aria-pressed="false">Fib retracement</button>
             <button type="button" data-drawing-action="delete" disabled>Delete</button>
             <button type="button" data-drawing-action="clear">Clear</button>
+            <button type="button" data-download-chart aria-label="Download weekly chart image">Download PNG</button>
             <button type="button" data-fullscreen-toggle aria-label="Pop out weekly chart">Pop out</button>
           </div>
         </div>
         <div class="chart-wrap">
           <div class="chart-stack">
-            <div id="weeklyChart" class="chart-box" role="img" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
+            <div id="weeklyChart" class="chart-box" role="group" aria-label="Weekly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
             <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
             <div id="weeklyRsiChart" class="rsi-chart-box" role="img" aria-label="Weekly 14-period relative strength index with 70 and 30 reference levels"></div>
             <div class="volume-heading">Volume</div>
@@ -494,15 +506,17 @@
             <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
             <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
             <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+            <button type="button" data-draw-mode="arrow" aria-pressed="false" title="Click the arrow's start, then its tip">Arrow</button>
             <button type="button" data-draw-mode="fibonacci" aria-pressed="false">Fib retracement</button>
             <button type="button" data-drawing-action="delete" disabled>Delete</button>
             <button type="button" data-drawing-action="clear">Clear</button>
+            <button type="button" data-download-chart aria-label="Download monthly chart image">Download PNG</button>
             <button type="button" data-fullscreen-toggle aria-label="Pop out monthly chart">Pop out</button>
           </div>
         </div>
         <div class="chart-wrap">
           <div class="chart-stack">
-            <div id="monthlyChart" class="chart-box" role="img" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
+            <div id="monthlyChart" class="chart-box" role="group" aria-label="Monthly candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
             <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
             <div id="monthlyRsiChart" class="rsi-chart-box" role="img" aria-label="Monthly 14-period relative strength index with 70 and 30 reference levels"></div>
             <div class="volume-heading">Volume</div>
@@ -540,15 +554,17 @@
           <button type="button" data-draw-mode="select" aria-pressed="true">Select</button>
           <button type="button" data-draw-mode="horizontal" aria-pressed="false">Horizontal</button>
           <button type="button" data-draw-mode="trendline" aria-pressed="false">Trendline</button>
+          <button type="button" data-draw-mode="arrow" aria-pressed="false" title="Click the arrow's start, then its tip">Arrow</button>
           <button type="button" data-draw-mode="fibonacci" aria-pressed="false">Fib retracement</button>
           <button type="button" data-drawing-action="delete" disabled>Delete</button>
           <button type="button" data-drawing-action="clear">Clear</button>
+          <button type="button" data-download-chart aria-label="Download daily chart image">Download PNG</button>
           <button type="button" data-fullscreen-toggle aria-label="Pop out daily chart">Pop out</button>
         </div>
       </div>
       <div class="chart-wrap">
         <div class="chart-stack">
-          <div id="dailyChart" class="chart-box daily-chart-box" role="img" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
+          <div id="dailyChart" class="chart-box daily-chart-box" role="group" aria-label="Daily candlestick chart with EMA 20, EMA 50, and SMA 200"></div>
           <div class="rsi-heading">RSI (14) <small>Overbought 70 · Oversold 30</small></div>
           <div id="dailyRsiChart" class="rsi-chart-box" role="img" aria-label="Daily 14-period relative strength index with 70 and 30 reference levels"></div>
           <div class="volume-heading">Volume</div>
@@ -690,6 +706,7 @@
             scaleMargins: { top: 0.08, bottom: 0.08 }
           },
           timeScale: { borderColor: '#cbd5e1', fixLeftEdge: true, fixRightEdge: false, rightOffset: 8 },
+          handleScale: { axisPressedMouseMove: { price: true, time: true }, axisDoubleClickReset: { price: true, time: true } },
           crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
         });
 
@@ -719,10 +736,27 @@
         overlay.setAttribute('aria-hidden', 'true');
         el.append(overlay);
 
+        const priceControls = document.createElement('div');
+        priceControls.className = 'price-scale-controls';
+        priceControls.setAttribute('aria-label', `${timeframe} price axis controls`);
+        for (const [action, label, description] of [
+          ['out', 'Y−', 'Zoom out'],
+          ['reset', 'Y Auto', 'Reset']
+        ]) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.dataset.priceScale = action;
+          button.textContent = label;
+          button.setAttribute('aria-label', `${description} ${timeframe} price axis`);
+          button.title = `${description} price axis`;
+          priceControls.append(button);
+        }
+        el.append(priceControls);
+
         return {
           chart, candleSeries, ema20, ema50, sma200, rsiChart: rsi.chart,
           rsiSeries: rsi.series, volumeChart: volume.chart, volumeSeries: volume.series,
-          el, overlay, timeframe,
+          el, overlay, priceControls, timeframe,
           mode: 'select', selectedId: null, draft: null, drag: null
         };
       }
@@ -925,6 +959,36 @@
         return { first, second, start, end };
       }
 
+      function getAnnotationLineCoordinates(context, annotation) {
+        if (annotation.type !== 'arrow') return getTrendlineCoordinates(context, annotation);
+        const first = getPointCoordinates(context, annotation.points[0]);
+        const second = getPointCoordinates(context, annotation.points[1]);
+        return first && second ? { first, second, start: first, end: second } : null;
+      }
+
+      function renderArrow(overlay, coordinates, isSelected, id) {
+        const { start, end } = coordinates;
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const length = Math.hypot(dx, dy);
+        const className = `drawing-arrow${isSelected ? ' selected' : ''}`;
+        overlay.append(createSvgElement('line', {
+          x1: start.x, y1: start.y, x2: end.x, y2: end.y,
+          class: className, 'data-annotation-id': id
+        }));
+        if (length < 0.001) return;
+        const ux = dx / length;
+        const uy = dy / length;
+        const headLength = Math.min(12, length);
+        const headWidth = headLength * 0.45;
+        const baseX = end.x - ux * headLength;
+        const baseY = end.y - uy * headLength;
+        overlay.append(createSvgElement('polygon', {
+          points: `${end.x},${end.y} ${baseX - uy * headWidth},${baseY + ux * headWidth} ${baseX + uy * headWidth},${baseY - ux * headWidth}`,
+          class: className, 'data-annotation-id': id
+        }));
+      }
+
       const fibonacciLevels = [
         { ratio: 0, label: '0%' },
         { ratio: 0.236, label: '23.6%', colorClass: 'outer' },
@@ -1025,14 +1089,18 @@
             continue;
           }
 
-          const coordinates = getTrendlineCoordinates(context, annotation);
+          const coordinates = getAnnotationLineCoordinates(context, annotation);
           if (!coordinates) continue;
-          overlay.append(createSvgElement('line', {
-            x1: coordinates.start.x, y1: coordinates.start.y,
-            x2: coordinates.end.x, y2: coordinates.end.y,
-            class: `drawing-line${isSelected ? ' selected' : ''}`,
-            'data-annotation-id': annotation.id
-          }));
+          if (annotation.type === 'arrow') {
+            renderArrow(overlay, coordinates, isSelected, annotation.id);
+          } else {
+            overlay.append(createSvgElement('line', {
+              x1: coordinates.start.x, y1: coordinates.start.y,
+              x2: coordinates.end.x, y2: coordinates.end.y,
+              class: `drawing-line${isSelected ? ' selected' : ''}`,
+              'data-annotation-id': annotation.id
+            }));
+          }
           if (isSelected) {
             for (const [index, point] of [coordinates.first, coordinates.second].entries()) {
               overlay.append(createSvgElement('circle', {
@@ -1043,7 +1111,7 @@
           }
         }
 
-        if (context.draft?.type === 'trendline') {
+        if (context.draft?.type === 'trendline' || context.draft?.type === 'arrow') {
           const draftPoint = getPointCoordinates(context, context.draft.points[0]);
           if (draftPoint) {
             overlay.append(createSvgElement('circle', {
@@ -1082,7 +1150,7 @@
               }
             }
           } else {
-            const coordinates = getTrendlineCoordinates(context, annotation);
+            const coordinates = getAnnotationLineCoordinates(context, annotation);
             if (coordinates) {
               const { start, end } = coordinates;
               const dx = end.x - start.x;
@@ -1175,7 +1243,90 @@
       $('#range').addEventListener('change', syncFullscreenControls);
       syncFullscreenControls();
 
+      async function downloadChartImage(context) {
+        if (!context.candleSeries.data().some((point) => Number.isFinite(point.close))) {
+          throw new Error('Load chart data before downloading an image.');
+        }
+
+        const priceImage = context.chart.takeScreenshot();
+        const rsiImage = context.rsiChart.takeScreenshot();
+        const volumeImage = context.volumeChart.takeScreenshot();
+        const overlay = context.overlay.cloneNode(true);
+        const originals = context.overlay.querySelectorAll('*');
+        const copies = overlay.querySelectorAll('*');
+        for (let i = 0; i < copies.length; i++) {
+          const style = getComputedStyle(originals[i]);
+          for (const property of ['stroke', 'stroke-width', 'stroke-dasharray', 'stroke-linejoin', 'fill', 'font', 'paint-order', 'vector-effect']) {
+            copies[i].style.setProperty(property, style.getPropertyValue(property));
+          }
+        }
+        overlay.querySelectorAll('.drawing-handle').forEach((handle) => handle.remove());
+        overlay.setAttribute('xmlns', svgNamespace);
+        overlay.setAttribute('width', context.el.clientWidth);
+        overlay.setAttribute('height', context.el.clientHeight);
+        const overlayUrl = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(overlay)], { type: 'image/svg+xml;charset=utf-8' }));
+        try {
+          const overlayImage = new Image();
+          overlayImage.src = overlayUrl;
+          await overlayImage.decode();
+
+          const canvas = document.createElement('canvas');
+          const scale = priceImage.width / context.el.clientWidth;
+          const titleHeight = Math.round(44 * scale);
+          const labelHeight = Math.round(26 * scale);
+          canvas.width = priceImage.width;
+          canvas.height = titleHeight + priceImage.height + labelHeight + rsiImage.height + labelHeight + volumeImage.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Could not create the chart image.');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#26313f';
+          ctx.font = `bold ${Math.round(17 * scale)}px system-ui, sans-serif`;
+          ctx.fillText(`${activeSymbol} · ${context.timeframe.toUpperCase()} CHART`, 12 * scale, 29 * scale);
+          let y = titleHeight;
+          ctx.drawImage(priceImage, 0, y);
+          ctx.drawImage(overlayImage, 0, y, priceImage.width, priceImage.height);
+          y += priceImage.height;
+          ctx.font = `bold ${Math.round(12 * scale)}px system-ui, sans-serif`;
+          ctx.fillText('RSI (14)', 12 * scale, y + 18 * scale);
+          y += labelHeight;
+          ctx.drawImage(rsiImage, 0, y, priceImage.width, rsiImage.height);
+          y += rsiImage.height;
+          ctx.fillText('Volume', 12 * scale, y + 18 * scale);
+          y += labelHeight;
+          ctx.drawImage(volumeImage, 0, y, priceImage.width, volumeImage.height);
+
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (!blob) throw new Error('Could not encode the chart image.');
+          const downloadUrl = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = downloadUrl;
+          link.download = `${activeSymbol.replace(/[^A-Z0-9._-]/g, '_')}-${context.timeframe}-chart.png`;
+          document.body.append(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(downloadUrl), 60000);
+        } finally {
+          URL.revokeObjectURL(overlayUrl);
+        }
+      }
+
       function attachDrawingInteractions(context) {
+        context.priceControls.addEventListener('click', (event) => {
+          const button = event.target.closest('button[data-price-scale]');
+          if (!button) return;
+          const priceScale = context.chart.priceScale('right');
+          if (button.dataset.priceScale === 'reset') {
+            priceScale.setAutoScale(true);
+          } else {
+            const range = priceScale.getVisibleRange();
+            if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to) || range.to <= range.from) return;
+            const center = (range.from + range.to) / 2;
+            const halfRange = (range.to - range.from) * 1.25 / 2;
+            priceScale.setVisibleRange({ from: center - halfRange, to: center + halfRange });
+          }
+          requestAnimationFrame(() => renderDrawingOverlay(context));
+        });
         const toolbar = document.querySelector(`[data-drawing-tools="${context.timeframe}"]`);
         toolbar?.addEventListener('click', (event) => {
           const button = event.target.closest('button');
@@ -1183,6 +1334,14 @@
 
           if (button.hasAttribute('data-fullscreen-toggle')) {
             toggleChartFullscreen(context);
+            return;
+          }
+
+          if (button.hasAttribute('data-download-chart')) {
+            downloadChartImage(context).catch((error) => {
+              $('#status').textContent = error instanceof Error ? error.message : 'Unable to download chart image.';
+              $('#status').classList.add('error');
+            });
             return;
           }
 
@@ -1244,6 +1403,18 @@
             context.selectedId = annotation.id;
             context.draft = null;
             context.mode = 'select';
+          } else if (context.mode === 'arrow' && !context.draft) {
+            context.draft = { type: 'arrow', points: [anchor] };
+          } else if (context.mode === 'arrow') {
+            const annotation = {
+              id: createAnnotationId(),
+              type: 'arrow',
+              points: [context.draft.points[0], anchor]
+            };
+            annotations.push(annotation);
+            context.selectedId = annotation.id;
+            context.draft = null;
+            context.mode = 'select';
           }
           updateDrawingToolbar(context);
           renderDrawingOverlay(context);
@@ -1286,6 +1457,11 @@
         context.resizeObserver = new ResizeObserver(() => renderDrawingOverlay(context));
         context.resizeObserver.observe(context.el);
         context.el.addEventListener('wheel', () => requestAnimationFrame(() => renderDrawingOverlay(context)), { passive: true });
+        context.el.addEventListener('pointermove', (event) => {
+          if (event.buttons && event.offsetX >= getPlotWidth(context)) {
+            requestAnimationFrame(() => renderDrawingOverlay(context));
+          }
+        });
         context.el.addEventListener('pointerup', () => requestAnimationFrame(() => renderDrawingOverlay(context)));
         updateDrawingToolbar(context);
         renderDrawingOverlay(context);
@@ -1603,6 +1779,21 @@
         return d.toISOString().slice(0, 10);
       }
 
+      function getFutureTimePoints(lastTime, timeframe, includeWeekends, count = 520) {
+        const date = new Date(`${lastTime}T00:00:00Z`);
+        const points = [];
+        while (points.length < count) {
+          if (timeframe === 'monthly') {
+            date.setUTCMonth(date.getUTCMonth() + 1);
+          } else {
+            date.setUTCDate(date.getUTCDate() + (timeframe === 'weekly' ? 7 : 1));
+            if (timeframe === 'daily' && !includeWeekends && (date.getUTCDay() === 0 || date.getUTCDay() === 6)) continue;
+          }
+          points.push({ time: date.toISOString().slice(0, 10) });
+        }
+        return points;
+      }
+
       function getRangeStartDate(range, latestDate) {
         const monthsByRange = { '6mo': 6, '1y': 12, '2y': 24, '5y': 60, '10y': 120 };
         const months = monthsByRange[range];
@@ -1676,6 +1867,7 @@
 
       function clearChartData() {
         for (const data of [weekly, monthly, daily]) {
+          data.chart.priceScale('right').setAutoScale(true);
           data.candleSeries.setData([]);
           data.ema20.setData([]);
           data.ema50.setData([]);
@@ -1895,9 +2087,17 @@
 
           if (!dailyRows.length) throw new Error('No price bars fall within the selected display range.');
 
-          weekly.candleSeries.setData(toCandlePoints(weeklyRows));
-          monthly.candleSeries.setData(toCandlePoints(monthlyRows));
-          daily.candleSeries.setData(toCandlePoints(dailyRows));
+          // Keep the future timeline in every pane without inventing price or volume data.
+          const includeWeekends = allDailyRows.slice(-60).some((row) => {
+            const day = new Date(`${row.time}T00:00:00Z`).getUTCDay();
+            return day === 0 || day === 6;
+          });
+          const weeklyFuture = getFutureTimePoints(weeklyRows.at(-1).time, 'weekly', includeWeekends);
+          const monthlyFuture = getFutureTimePoints(monthlyRows.at(-1).time, 'monthly', includeWeekends);
+          const dailyFuture = getFutureTimePoints(dailyRows.at(-1).time, 'daily', includeWeekends);
+          weekly.candleSeries.setData([...toCandlePoints(weeklyRows), ...weeklyFuture]);
+          monthly.candleSeries.setData([...toCandlePoints(monthlyRows), ...monthlyFuture]);
+          daily.candleSeries.setData([...toCandlePoints(dailyRows), ...dailyFuture]);
           const toVolumePoints = (volumeRows) => volumeRows.map((row) => ({
             time: row.time,
             value: Number.isFinite(row.volume) ? row.volume : 0,
@@ -1906,9 +2106,9 @@
           const weeklyVolumePoints = toVolumePoints(weeklyRows);
           const monthlyVolumePoints = toVolumePoints(monthlyRows);
           const dailyVolumePoints = toVolumePoints(dailyRows);
-          weekly.volumeSeries.setData(weeklyVolumePoints);
-          monthly.volumeSeries.setData(monthlyVolumePoints);
-          daily.volumeSeries.setData(dailyVolumePoints);
+          weekly.volumeSeries.setData([...weeklyVolumePoints, ...weeklyFuture]);
+          monthly.volumeSeries.setData([...monthlyVolumePoints, ...monthlyFuture]);
+          daily.volumeSeries.setData([...dailyVolumePoints, ...dailyFuture]);
 
           const weeklyMetrics = buildWeeklyMetrics(allWeeklyRows);
           setMetricPoints(
@@ -1983,15 +2183,15 @@
           weekly.volumeByTime = new Map(weeklyVolumePoints.map((point) => [chartTimeKey(point.time), point.value]));
           monthly.volumeByTime = new Map(monthlyVolumePoints.map((point) => [chartTimeKey(point.time), point.value]));
           daily.volumeByTime = new Map(dailyVolumePoints.map((point) => [chartTimeKey(point.time), point.value]));
-          weekly.rsiSeries.setData(weeklyRsiPoints.map((point) => (
+          weekly.rsiSeries.setData([...weeklyRsiPoints.map((point) => (
             Number.isFinite(point.value) ? point : { time: point.time }
-          )));
-          monthly.rsiSeries.setData(monthlyRsiPoints.map((point) => (
+          )), ...weeklyFuture]);
+          monthly.rsiSeries.setData([...monthlyRsiPoints.map((point) => (
             Number.isFinite(point.value) ? point : { time: point.time }
-          )));
-          daily.rsiSeries.setData(dailyRsiPoints.map((point) => (
+          )), ...monthlyFuture]);
+          daily.rsiSeries.setData([...dailyRsiPoints.map((point) => (
             Number.isFinite(point.value) ? point : { time: point.time }
-          )));
+          )), ...dailyFuture]);
 
           buildLineSeries(weekly.ema20, buildMoveSeries(weeklyCloses, allWeeklyRows, 20)
             .filter((point) => !weeklyStart || point.time >= weeklyStart));
@@ -2057,9 +2257,9 @@
           const displayStatus = range === 'max' ? 'all history displayed' : `${range} displayed`;
 
           $('#status').textContent = `${symbol} — ${displayStatus}; averages use all available history · Last ${formatOutput(last.close, currency)}${changeText}${averageStatus}`;
-          weekly.chart.timeScale().fitContent();
-          monthly.chart.timeScale().fitContent();
-          daily.chart.timeScale().fitContent();
+          for (const [context, visibleRows] of [[weekly, weeklyRows], [monthly, monthlyRows], [daily, dailyRows]]) {
+            context.chart.timeScale().setVisibleLogicalRange({ from: 0, to: visibleRows.length - 1 + 8 });
+          }
           for (const context of chartContexts.values()) context.syncTimeRange();
           for (const view of Object.values(metricViews)) {
             view.histogram.chart.timeScale().fitContent();
